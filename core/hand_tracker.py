@@ -1,18 +1,20 @@
 """
-ماژول تشخیص دست با استفاده از MediaPipe 1.0.0
+ماژول تشخیص دست با استفاده از MediaPipe 1.0.0 (روش tasks)
 مسئول شناسایی دست، نقاط کلیدی و وضعیت انگشتان
 """
 
 import cv2
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 import sys
 import os
 
 # اضافه کردن مسیر پروژه به sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import MEDIAPIPE_SETTINGS, CAMERA_SETTINGS
-from utils.helpers import get_bounding_box, log_message
+from config.settings import MEDIAPIPE_SETTINGS
+from utils.helpers import log_message
 
 
 class HandTracker:
@@ -27,19 +29,23 @@ class HandTracker:
         
         # تنظیمات MediaPipe
         self.max_num_hands = MEDIAPIPE_SETTINGS['max_num_hands']
-        self.min_detection_confidence = MEDIAPIPE_SETTINGS['min_detection_confidence']
-        self.min_tracking_confidence = MEDIAPIPE_SETTINGS['min_tracking_confidence']
-        self.static_image_mode = MEDIAPIPE_SETTINGS['static_image_mode']
         
-        # راه‌اندازی MediaPipe Hands با روش جدید
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=self.static_image_mode,
-            max_num_hands=self.max_num_hands,
-            min_detection_confidence=self.min_detection_confidence,
-            min_tracking_confidence=self.min_tracking_confidence
+        # بررسی وجود فایل مدل
+        model_path = 'hand_landmarker.task'
+        if not os.path.exists(model_path):
+            log_message("⚠️ فایل مدل پیدا نشد! در حال دانلود...")
+            self._download_model()
+        
+        # راه‌اندازی با روش tasks
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            num_hands=self.max_num_hands,
+            min_hand_detection_confidence=MEDIAPIPE_SETTINGS['min_detection_confidence'],
+            min_hand_presence_confidence=MEDIAPIPE_SETTINGS['min_tracking_confidence'],
+            min_tracking_confidence=MEDIAPIPE_SETTINGS['min_tracking_confidence']
         )
-        self.mp_draw = mp.solutions.drawing_utils
+        self.detector = vision.HandLandmarker.create_from_options(options)
         
         # متغیرهای وضعیت
         self.hand_detected = False
@@ -48,6 +54,14 @@ class HandTracker:
         self.fingers_status = None
         
         log_message("✅ HandTracker راه‌اندازی شد")
+    
+    def _download_model(self):
+        """دانلود فایل مدل"""
+        import urllib.request
+        url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        log_message(f"📥 در حال دانلود مدل از {url}...")
+        urllib.request.urlretrieve(url, 'hand_landmarker.task')
+        log_message("✅ مدل دانلود شد!")
     
     def process_frame(self, frame):
         """
@@ -62,8 +76,11 @@ class HandTracker:
         # تبدیل BGR به RGB
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
-        # پردازش با MediaPipe
-        result = self.hands.process(rgb)
+        # تبدیل به Image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        
+        # تشخیص دست
+        detection_result = self.detector.detect(mp_image)
         
         # بازنشانی وضعیت
         self.hand_detected = False
@@ -71,15 +88,28 @@ class HandTracker:
         self.bounding_box = None
         self.fingers_status = None
         
-        if result.multi_hand_landmarks:
+        if detection_result.hand_landmarks:
             self.hand_detected = True
             # گرفتن اولین دست (فقط یک دست)
-            hand_landmarks = result.multi_hand_landmarks[0]
-            self.landmarks = hand_landmarks.landmark
+            hand_landmarks = detection_result.hand_landmarks[0]
+            self.landmarks = hand_landmarks
             
             # محاسبه‌ی کادر
             h, w, _ = frame.shape
-            self.bounding_box = get_bounding_box(self.landmarks, w, h)
+            x_coords = [lm.x for lm in hand_landmarks]
+            y_coords = [lm.y for lm in hand_landmarks]
+            x_min = int(min(x_coords) * w) - 20
+            x_max = int(max(x_coords) * w) + 20
+            y_min = int(min(y_coords) * h) - 20
+            y_max = int(max(y_coords) * h) + 20
+            
+            # محدود کردن به ابعاد تصویر
+            x_min = max(0, x_min)
+            x_max = min(w, x_max)
+            y_min = max(0, y_min)
+            y_max = min(h, y_max)
+            
+            self.bounding_box = ((x_min, y_min), (x_max, y_max))
             
             # استخراج وضعیت انگشتان
             self.fingers_status = self.get_fingers_status()
@@ -167,20 +197,53 @@ class HandTracker:
         """بررسی اینکه آیا دستی تشخیص داده شده است"""
         return self.hand_detected
     
+    def draw_landmarks(self, frame, color=(0, 255, 255)):
+        """
+        رسم نقاط و اتصالات دست روی تصویر
+        
+        Args:
+            frame: تصویر
+            color: رنگ نقاط (BGR)
+        """
+        if not self.landmarks:
+            return frame
+        
+        h, w, _ = frame.shape
+        
+        # رسم نقاط
+        for lm in self.landmarks:
+            cx, cy = int(lm.x * w), int(lm.y * h)
+            cv2.circle(frame, (cx, cy), 3, color, -1)
+        
+        # رسم اتصالات
+        connections = [
+            (0,1), (1,2), (2,3), (3,4),  # شست
+            (0,5), (5,6), (6,7), (7,8),  # اشاره
+            (0,9), (9,10), (10,11), (11,12),  # وسط
+            (0,13), (13,14), (14,15), (15,16),  # حلقه
+            (0,17), (17,18), (18,19), (19,20),  # کوچک
+            (5,9), (9,13), (13,17)  # اتصالات بین انگشتان
+        ]
+        for i, j in connections:
+            x1, y1 = int(self.landmarks[i].x * w), int(self.landmarks[i].y * h)
+            x2, y2 = int(self.landmarks[j].x * w), int(self.landmarks[j].y * h)
+            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
+        
+        return frame
+    
     def release(self):
         """آزادسازی منابع"""
-        self.hands.close()
-        log_message("HandTracker آزاد شد")
+        log_message("HandTracker released")
 
 
 # ==================== تست سریع ====================
 if __name__ == "__main__":
-    print("🧪 تست HandTracker...")
+    print("🧪 HandTracker Test...")
     
     # راه‌اندازی دوربین
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        print("❌ دوربین پیدا نشد!")
+        print("❌ Camera not found!")
         exit()
     
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -189,12 +252,12 @@ if __name__ == "__main__":
     # راه‌اندازی HandTracker
     tracker = HandTracker()
     
-    print("📹 دوربین باز شد. برای خروج 'q' را بزنید.")
+    print("📹 Camera opened. Press 'q' to exit.")
     
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("❌ خطا در دریافت تصویر!")
+            print("❌ Error reading frame!")
             break
         
         frame = cv2.flip(frame, 1)
@@ -205,21 +268,24 @@ if __name__ == "__main__":
         if detected:
             # گرفتن وضعیت انگشتان
             fingers = tracker.get_fingers_status()
-            finger_names = ["شست", "اشاره", "وسط", "حلقه", "کوچک"]
-            status_text = " ".join([f"{name}:{'⬆️' if f else '⬇️'}" for name, f in zip(finger_names, fingers)])
+            finger_names = ["Thumb", "Index", "Middle", "Ring", "Pinky"]
+            status_text = " ".join([f"{name}:{'UP' if f else 'DOWN'}" for name, f in zip(finger_names, fingers)])
             
             # گرفتن کادر
             if tracker.bounding_box:
                 (x1, y1), (x2, y2) = tracker.bounding_box
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, "✅ Hand Detected", (x1, y1 - 10), 
+                cv2.putText(frame, "HAND DETECTED", (x1, y1 - 10), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # رسم نقاط و اتصالات
+            tracker.draw_landmarks(frame)
             
             # نمایش وضعیت انگشتان
             cv2.putText(frame, status_text, (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         else:
-            cv2.putText(frame, "⏳ Waiting for hand...", (10, 30), 
+            cv2.putText(frame, "WAITING FOR HAND...", (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
         cv2.imshow("HandTracker Test", frame)
@@ -230,4 +296,4 @@ if __name__ == "__main__":
     tracker.release()
     cap.release()
     cv2.destroyAllWindows()
-    print("✅ تست پایان یافت")
+    print("✅ Test finished")

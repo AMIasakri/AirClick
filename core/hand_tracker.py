@@ -1,5 +1,5 @@
 """
-ماژول تشخیص دست با استفاده از MediaPipe
+ماژول تشخیص دست با استفاده از MediaPipe 1.0.0
 مسئول شناسایی دست، نقاط کلیدی و وضعیت انگشتان
 """
 
@@ -17,7 +17,7 @@ from utils.helpers import get_bounding_box, log_message
 
 class HandTracker:
     """
-    کلاس تشخیص دست با MediaPipe
+    کلاس تشخیص دست با MediaPipe 1.0.0
     مدیریت تشخیص دست، استخراج نقاط کلیدی و وضعیت انگشتان
     """
     
@@ -31,8 +31,7 @@ class HandTracker:
         self.min_tracking_confidence = MEDIAPIPE_SETTINGS['min_tracking_confidence']
         self.static_image_mode = MEDIAPIPE_SETTINGS['static_image_mode']
         
-        # راه‌اندازی MediaPipe Hands (روش جدید برای نسخه 1.0.0)
-        # در نسخه‌های جدید باید از mp.solutions.hands استفاده کرد
+        # راه‌اندازی MediaPipe Hands با روش جدید
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=self.static_image_mode,
@@ -163,32 +162,6 @@ class HandTracker:
         
         (x1, y1), (x2, y2) = self.bounding_box
         return ((x1 + x2) // 2, (y1 + y2) // 2)
-    
-    def draw_hand(self, frame, show_landmarks=False):
-        """
-        رسم کادر و نقاط دست روی تصویر
-        
-        Args:
-            frame: تصویر ورودی
-            show_landmarks: آیا نقاط کلیدی رسم شوند؟
-        
-        Returns:
-            frame: تصویر با رسم‌ها
-        """
-        if not self.hand_detected or not self.landmarks:
-            return frame
-        
-        # رسم نقاط کلیدی (اختیاری)
-        if show_landmarks:
-            # در نسخه‌های جدید باید از این روش استفاده کرد
-            try:
-                # ایجاد یک آبجکت موقت برای رسم
-                hand_landmarks = self.mp_hands.HandLandmarks()
-                # این بخش ممکنه در نسخه‌های مختلف فرق کنه
-            except:
-                pass
-        
-        return frame
     
     def is_hand_detected(self):
         """بررسی اینکه آیا دستی تشخیص داده شده است"""

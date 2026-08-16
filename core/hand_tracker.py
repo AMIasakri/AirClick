@@ -13,8 +13,9 @@ from collections import deque
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import MEDIAPIPE_SETTINGS
+from config.settings import MEDIAPIPE_SETTINGS, HAND_SETTINGS
 from utils.helpers import log_message
+import math
 
 
 class HandTracker:
@@ -67,9 +68,19 @@ class HandTracker:
             }
         }
         
-        self.max_lost_frames = 3  # حافظه کوتاه فقط برای نمایش، نه کنترل موس
+        self.max_lost_frames = 3
+
+        self.mouse_hand_index = -1
+        self.click_hand_index = -1
+        self.hand_separation = None
+        self.hands_too_close = False
+
+        self.role_memory = {
+            'mouse': {'center': None, 'lost': 0},
+            'click': {'center': None, 'lost': 0},
+        }
         
-        log_message("✅ HandTracker راه‌اندازی شد (با حافظه و پایداری)")
+        log_message("HandTracker ready")
     
     def _download_model(self):
         import urllib.request
@@ -209,8 +220,161 @@ class HandTracker:
                         # لندمارک‌های تقریبی (برای نمایش)
                         self.all_landmarks.append(None)
                         self.hand_is_live.append(False)
-        
+
+        self._assign_hand_roles(w, h)
         return len(self.hands_detected)
+
+    def _hand_center(self, index):
+        box = self.all_bounding_boxes[index]
+        return (
+            (box[0][0] + box[1][0]) // 2,
+            (box[0][1] + box[1][1]) // 2,
+        )
+
+    def _update_role_memory(self, role, center):
+        self.role_memory[role]['center'] = center
+        self.role_memory[role]['lost'] = 0
+
+    def _dist(self, a, b):
+        return math.hypot(a[0] - b[0], a[1] - b[1])
+
+    def _resolve_single_hand_role(self, detection, frame_width):
+        cx = detection['center_x']
+        mouse_mem = self.role_memory['mouse']['center']
+        click_mem = self.role_memory['click']['center']
+
+        if mouse_mem and click_mem:
+            if self._dist((cx, detection['center_y']), mouse_mem) <= self._dist((cx, detection['center_y']), click_mem):
+                return 'mouse'
+            return 'click'
+
+        if mouse_mem and self.role_memory['mouse']['lost'] < 15:
+            if self._dist((cx, detection['center_y']), mouse_mem) < 120:
+                return 'mouse'
+        if click_mem and self.role_memory['click']['lost'] < 15:
+            if self._dist((cx, detection['center_y']), click_mem) < 120:
+                return 'click'
+
+        # دوربین آینه‌ای: دست راست کاربر سمت چپ تصویر
+        return 'mouse' if cx < frame_width * 0.5 else 'click'
+
+    def _match_hands_to_roles(self, d0, d1):
+        c0 = (d0['center_x'], d0['center_y'])
+        c1 = (d1['center_x'], d1['center_y'])
+        mouse_mem = self.role_memory['mouse']['center']
+        click_mem = self.role_memory['click']['center']
+
+        if mouse_mem and click_mem:
+            assign_a = self._dist(c0, mouse_mem) + self._dist(c1, click_mem)
+            assign_b = self._dist(c0, click_mem) + self._dist(c1, mouse_mem)
+            if assign_a <= assign_b:
+                mouse_idx, click_idx = d0['index'], d1['index']
+                mouse_center, click_center = c0, c1
+            else:
+                mouse_idx, click_idx = d1['index'], d0['index']
+                mouse_center, click_center = c1, c0
+        else:
+            if d0['center_x'] <= d1['center_x']:
+                mouse_idx, click_idx = d0['index'], d1['index']
+                mouse_center, click_center = c0, c1
+            else:
+                mouse_idx, click_idx = d1['index'], d0['index']
+                mouse_center, click_center = c1, c0
+
+        self._update_role_memory('mouse', mouse_center)
+        self._update_role_memory('click', click_center)
+        return mouse_idx, click_idx
+
+    def _assign_hand_roles(self, frame_width, frame_height):
+        self.mouse_hand_index = -1
+        self.click_hand_index = -1
+        self.hand_separation = None
+        self.hands_too_close = False
+
+        live_indices = [i for i, live in enumerate(self.hand_is_live) if live]
+        if not live_indices:
+            self.role_memory['mouse']['lost'] += 1
+            self.role_memory['click']['lost'] += 1
+            return
+
+        detections = []
+        for i in live_indices:
+            cx, cy = self._hand_center(i)
+            detections.append({'index': i, 'center_x': cx, 'center_y': cy})
+
+        if len(detections) == 1:
+            d = detections[0]
+            role = self._resolve_single_hand_role(d, frame_width)
+            if role == 'mouse':
+                self.mouse_hand_index = d['index']
+                self._update_role_memory('mouse', (d['center_x'], d['center_y']))
+                self.role_memory['click']['lost'] += 1
+            else:
+                self.click_hand_index = d['index']
+                self._update_role_memory('click', (d['center_x'], d['center_y']))
+                self.role_memory['mouse']['lost'] += 1
+            return
+
+        if len(detections) >= 2:
+            detections.sort(key=lambda d: d['center_x'])
+            d0, d1 = detections[0], detections[-1]
+            self.hand_separation = self._dist(
+                (d0['center_x'], d0['center_y']),
+                (d1['center_x'], d1['center_y']),
+            )
+            self.hands_too_close = self.hand_separation < HAND_SETTINGS['min_hand_separation']
+            self.mouse_hand_index, self.click_hand_index = self._match_hands_to_roles(d0, d1)
+
+    def get_mouse_hand_index(self):
+        return self.mouse_hand_index
+
+    def get_click_hand_index(self):
+        return self.click_hand_index
+
+    def is_pointer_gesture(self, index, latched=False):
+        """ژست اشاره برای حرکت موس — با تحمل خم شدن"""
+        if self.is_drag_gesture(index):
+            return False
+
+        landmarks = self.get_landmarks(index)
+        if not landmarks:
+            return False
+
+        middle_up = self._finger_extended(landmarks, 12, 10, margin=0.006)
+        ring_up = self._finger_extended(landmarks, 16, 14, margin=0.006)
+        pinky_up = self._finger_extended(landmarks, 20, 18, margin=0.006)
+        if middle_up or ring_up or pinky_up:
+            return False
+
+        tip, pip, mcp = landmarks[8], landmarks[6], landmarks[5]
+        bend_limit = HAND_SETTINGS['movement_index_bend']
+
+        if latched and HAND_SETTINGS['movement_latch']:
+            return tip.y < mcp.y + bend_limit
+
+        return tip.y < pip.y + 0.006 and tip.y < mcp.y + bend_limit * 0.7
+
+    def is_drag_gesture(self, index):
+        """V sign — اشاره و وسط بالا"""
+        landmarks = self.get_landmarks(index)
+        if not landmarks:
+            return False
+
+        index_up = self._finger_extended(landmarks, 8, 6, margin=0.008)
+        middle_up = self._finger_extended(landmarks, 12, 10, margin=0.008)
+        ring_up = self._finger_extended(landmarks, 16, 14, margin=0.006)
+        pinky_up = self._finger_extended(landmarks, 20, 18, margin=0.006)
+        return index_up and middle_up and not ring_up and not pinky_up
+
+    def get_hand_center_y(self, index, frame_height):
+        box = self.get_bounding_box(index)
+        if box:
+            return (box[0][1] + box[1][1]) // 2
+        landmarks = self.get_landmarks(index)
+        if landmarks:
+            ys = [lm.y for lm in landmarks]
+            return int(sum(ys) / len(ys) * frame_height)
+        return None
     
     def _get_fingers_status(self, landmarks):
         """تشخیص وضعیت انگشتان با آستانه‌های نرم‌تر"""

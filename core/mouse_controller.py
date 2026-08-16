@@ -1,5 +1,5 @@
 """
-ماژول کنترل موس - حرکت نسبی برای پایداری
+ماژول کنترل موس - حرکت نسبی، drag، scroll
 """
 
 import pyautogui
@@ -15,7 +15,7 @@ from utils.helpers import log_message
 
 
 class MouseController:
-    """کنترل موس با حرکت نسبی و anchor برای جلوگیری از پرش"""
+    """کنترل موس با حرکت نسبی و پشتیبانی از drag/scroll"""
 
     def __init__(self):
         log_message("در حال راه‌اندازی MouseController...")
@@ -25,6 +25,9 @@ class MouseController:
         self.dead_zone = MOUSE_SETTINGS['dead_zone']
         self.smoothing = MOUSE_SETTINGS['smoothing_factor']
         self.relative_mode = MOUSE_SETTINGS.get('relative_mode', True)
+        self.scroll_speed = MOUSE_SETTINGS.get('scroll_speed', 3)
+        self.scroll_dead_zone = MOUSE_SETTINGS.get('scroll_dead_zone', 8)
+        self.double_click_interval = MOUSE_SETTINGS.get('double_click_interval', 0.35)
 
         self.screen_width, self.screen_height = pyautogui.size()
         self.current_x = self.screen_width // 2
@@ -37,16 +40,22 @@ class MouseController:
         self.last_tip_x = None
         self.last_tip_y = None
         self.tracking_active = False
+        self.drag_active = False
+        self.drag_button = 'left'
+
+        self.last_scroll_y = None
+        self.scroll_active = False
 
         self.last_action_time = 0
+        self.last_click_time = 0
+        self.pending_single_click = False
 
-        log_message(f"📺 Screen: {self.screen_width}x{self.screen_height}")
         pyautogui.FAILSAFE = False
         pyautogui.MINIMUM_DURATION = 0.01
-        log_message("✅ MouseController ready (relative mode)")
+        log_message(f"Screen: {self.screen_width}x{self.screen_height}")
+        log_message("MouseController ready")
 
     def move(self, tip_x, tip_y, frame_width, frame_height, reanchor=False):
-        """حرکت موس - نسبی یا مطلق"""
         if self.relative_mode:
             return self._move_relative(tip_x, tip_y, frame_width, frame_height, reanchor)
         return self._move_absolute(tip_x, tip_y, frame_width, frame_height)
@@ -114,29 +123,74 @@ class MouseController:
         pyautogui.moveTo(self.current_x, self.current_y, duration=0.01)
         return self.current_x, self.current_y
 
-    def click_left(self):
-        if self._can_act():
-            pyautogui.click(button='left')
+    def start_drag(self, button='left'):
+        if not self.drag_active and self._can_act():
+            pyautogui.mouseDown(button=button)
+            self.drag_active = True
+            self.drag_button = button
             self.last_action_time = time.time()
-            log_message("LEFT CLICK")
+            log_message(f"DRAG START ({button})")
             return True
         return False
+
+    def stop_drag(self):
+        if self.drag_active:
+            pyautogui.mouseUp(button=self.drag_button)
+            log_message("DRAG END")
+            self.drag_active = False
+            self.last_action_time = time.time()
+            return True
+        return False
+
+    def scroll(self, hand_y, reanchor=False):
+        if reanchor or not self.scroll_active:
+            self.last_scroll_y = hand_y
+            self.scroll_active = True
+            return 0
+
+        dy = hand_y - self.last_scroll_y
+        self.last_scroll_y = hand_y
+
+        if abs(dy) < self.scroll_dead_zone:
+            return 0
+
+        clicks = int(dy / self.scroll_dead_zone) * self.scroll_speed
+        if clicks != 0:
+            pyautogui.scroll(-clicks)
+            log_message(f"SCROLL {clicks}")
+        return clicks
+
+    def stop_scroll(self):
+        self.scroll_active = False
+        self.last_scroll_y = None
+
+    def click_left(self):
+        pyautogui.click(button='left')
+        self.last_action_time = time.time()
+        self.last_click_time = time.time()
+        log_message("LEFT CLICK")
+        return True
 
     def click_right(self):
-        if self._can_act():
-            pyautogui.click(button='right')
-            self.last_action_time = time.time()
-            log_message("RIGHT CLICK")
-            return True
-        return False
+        pyautogui.click(button='right')
+        self.last_action_time = time.time()
+        self.last_click_time = time.time()
+        log_message("RIGHT CLICK")
+        return True
 
     def click_middle(self):
-        if self._can_act():
-            pyautogui.middleClick()
-            self.last_action_time = time.time()
-            log_message("🖱️ MIDDLE CLICK")
-            return True
-        return False
+        pyautogui.middleClick()
+        self.last_action_time = time.time()
+        self.last_click_time = time.time()
+        log_message("MIDDLE CLICK")
+        return True
+
+    def click_double(self):
+        pyautogui.doubleClick()
+        self.last_action_time = time.time()
+        self.last_click_time = time.time()
+        log_message("DOUBLE CLICK")
+        return True
 
     def get_position(self):
         return self.current_x, self.current_y
@@ -145,11 +199,13 @@ class MouseController:
         return time.time() - self.last_action_time >= self.action_cooldown
 
     def pause_tracking(self):
-        """توقف ردیابی بدون تغییر موقعیت موس - برای بازگشت دست"""
+        if self.drag_active:
+            self.stop_drag()
         self.tracking_active = False
         self.last_tip_x = None
         self.last_tip_y = None
 
     def reset(self):
         self.pause_tracking()
+        self.stop_scroll()
         self.position_history.clear()

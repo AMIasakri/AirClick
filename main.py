@@ -1,7 +1,6 @@
 """
 AirClick - کنترل موس با دو دست
-دست راست = حرکت موس (حرکت نسبی)
-دست چپ = اشاره پایین: کلیک چپ | وسط پایین: کلیک راست
+دست موس = حرکت | دست کلیک = کلیک‌ها
 """
 
 import cv2
@@ -9,6 +8,7 @@ import sys
 import os
 import time
 import tkinter as tk
+import threading
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,63 +24,49 @@ class HelpWindow:
     def show():
         root = tk.Tk()
         root.title("AirClick - راهنما")
-        root.geometry("500x560")
+        root.geometry("500x600")
         root.resizable(False, False)
         root.configure(bg='#0a0a1a')
         root.attributes('-topmost', True)
 
-        header = tk.Frame(root, bg='#0a0a1a')
-        header.pack(fill='x', pady=18)
-
-        tk.Label(header, text="AIRCLICK PRO",
-                 font=("Segoe UI", 20, "bold"), fg="#e94560", bg='#0a0a1a').pack()
-        tk.Label(header, text="کنترل موس با دو دست",
-                 font=("Segoe UI", 10), fg="#888899", bg='#0a0a1a').pack()
-
+        tk.Label(root, text="AIRCLICK PRO", font=("Segoe UI", 20, "bold"),
+                 fg="#e94560", bg='#0a0a1a').pack(pady=(18, 4))
+        tk.Label(root, text="کنترل موس با دو دست", font=("Segoe UI", 10),
+                 fg="#888899", bg='#0a0a1a').pack()
         tk.Frame(root, height=2, bg='#e94560').pack(fill='x', padx=30, pady=8)
 
-        gestures_frame = tk.Frame(root, bg='#0a0a1a')
-        gestures_frame.pack(pady=8, padx=20, fill='x')
-
         sections = [
-            ("دست راست — حرکت موس", "#51cf66", [
-                ("☝️  فقط اشاره بالا", "حرکت موس (نسبی)", "#51cf66"),
-                ("🖐️  همه انگشتان باز", "آماده", "#4fc3f7"),
+            ("دست موس (سمت چپ تصویر)", "#51cf66", [
+                ("☝️  فقط اشاره بالا", "حرکت موس"),
+                ("✌️  اشاره + وسط بالا", "Drag"),
             ]),
-            ("دست چپ — کلیک", "#ff922b", [
-                ("👇  اشاره پایین", "کلیک چپ", "#ff6b6b"),
-                ("🖕  وسط پایین (اشاره بالا)", "کلیک راست", "#ffd43b"),
+            ("دست کلیک (سمت راست تصویر)", "#ff922b", [
+                ("👇  اشاره پایین", "کلیک چپ"),
+                ("🖕  وسط پایین", "کلیک راست"),
+                ("✊  مشت", "کلیک وسط"),
+                ("✌️↓  اشاره+وسط پایین", "دابل کلیک"),
+                ("💍  حلقه پایین", "اسکرول"),
             ]),
         ]
-
-        for title, title_color, items in sections:
-            tk.Label(gestures_frame, text=title,
-                     font=("Segoe UI", 11, "bold"), fg=title_color, bg='#0a0a1a').pack(pady=(12, 6), anchor='w')
-            for gesture, action, color in items:
-                row = tk.Frame(gestures_frame, bg='#12122a')
-                row.pack(pady=3, fill='x')
-                tk.Label(row, text=gesture, font=("Segoe UI", 10),
-                         fg="#ffffff", bg='#12122a', width=22, anchor='w').pack(side='left', padx=10, pady=6)
+        for title, color, items in sections:
+            tk.Label(root, text=title, font=("Segoe UI", 11, "bold"),
+                     fg=color, bg='#0a0a1a').pack(pady=(10, 4), anchor='w', padx=20)
+            for gesture, action in items:
+                row = tk.Frame(root, bg='#12122a')
+                row.pack(pady=2, fill='x', padx=20)
+                tk.Label(row, text=gesture, font=("Segoe UI", 10), fg="#fff",
+                         bg='#12122a', width=22, anchor='w').pack(side='left', padx=10, pady=5)
                 tk.Label(row, text=action, font=("Segoe UI", 9),
                          fg=color, bg='#12122a').pack(side='right', padx=10)
 
-        tk.Frame(root, height=1, bg='#2a2a4a').pack(fill='x', padx=30, pady=12)
-
-        tips = [
-            "💡 نور کافی داشته باش",
-            "🖱️ موس با حرکت نسبی جابه‌جا می‌شود — پرش نمی‌کند",
-            "🟢 دست راست = حرکت  |  🟠 دست چپ = کلیک",
-            "⌨️  q = خروج  |  h = راهنما",
-        ]
-        for tip in tips:
+        for tip in ["💡 نور کافی داشته باش", "↔️  دست‌ها را از هم فاصله بده",
+                    "⌨️  q=خروج | h=راهنما | d=دیباگ"]:
             tk.Label(root, text=tip, font=("Segoe UI", 9),
                      fg="#666688", bg='#0a0a1a').pack(pady=2)
 
-        tk.Button(root, text="بستن", command=root.destroy,
-                  font=("Segoe UI", 10, "bold"), bg="#e94560",
-                  fg="white", padx=40, pady=8, relief='flat',
-                  activebackground="#c73652", cursor="hand2").pack(pady=18)
-
+        tk.Button(root, text="بستن", command=root.destroy, font=("Segoe UI", 10, "bold"),
+                  bg="#e94560", fg="white", padx=40, pady=8, relief='flat',
+                  cursor="hand2").pack(pady=16)
         root.mainloop()
 
 
@@ -98,6 +84,7 @@ class AirClick:
         self.frame_height = CAMERA_SETTINGS['frame_height']
         self.show_fps = DISPLAY_SETTINGS['show_fps']
         self.show_landmarks = DISPLAY_SETTINGS['show_landmarks']
+        self.show_debug = DISPLAY_SETTINGS['show_debug']
         self.click_cooldown = MOUSE_SETTINGS['action_cooldown']
 
         self.running = False
@@ -114,11 +101,16 @@ class AirClick:
         self.last_click_type = None
         self.left_click_active = False
         self.right_click_active = False
-        self.right_hand_was_moving = False
-        self.cursor_tip = None
+        self.middle_click_active = False
+        self.double_click_active = False
+        self.scroll_active = False
+        self.drag_active = False
 
-        self.mouse_locked = False
+        self.movement_latched = False
+        self.cursor_tip = None
         self.hand_was_detected = False
+        self.hands_too_close = False
+        self.debug_info = []
 
         self.cap = cv2.VideoCapture(CAMERA_SETTINGS['camera_id'])
         if not self.cap.isOpened():
@@ -127,28 +119,15 @@ class AirClick:
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
-
         log_message(f"Camera: {self.frame_width}x{self.frame_height}")
-        self.print_help()
-
-    def print_help(self):
-        print("\n" + "=" * 50)
-        print("  AIRCLICK PRO - TWO HAND CONTROL")
-        print("=" * 50)
-        print("  RIGHT HAND (green):")
-        print("     Index up only  ->  Move mouse (relative)")
-        print("  LEFT HAND (orange):")
-        print("     Index down     ->  Left click")
-        print("     Middle down    ->  Right click")
-        print("-" * 50)
-        print("  q = Exit    h = Help")
-        print("=" * 50 + "\n")
 
     def run(self):
         self.running = True
+        win_w = DISPLAY_SETTINGS.get('window_width', 680)
+        win_h = DISPLAY_SETTINGS.get('window_height', 540)
 
         cv2.namedWindow("AirClick", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("AirClick", 680, 540)
+        cv2.resizeWindow("AirClick", win_w, win_h)
         cv2.setWindowProperty("AirClick", cv2.WND_PROP_TOPMOST, 1)
 
         while self.running:
@@ -157,187 +136,256 @@ class AirClick:
                 break
 
             frame = cv2.flip(frame, 1)
-            processed = self.process_frame(frame)
-            processed = self.draw_overlay(processed)
+            self.process_frame(frame)
+            display = self.draw_overlay(frame)
 
-            cv2.imshow("AirClick", processed)
+            cv2.imshow("AirClick", display)
             self.frame_count += 1
 
             key = cv2.waitKey(1) & 0xFF
             if key in (ord('q'), 27):
                 break
             if key == ord('h'):
-                import threading
                 threading.Thread(target=HelpWindow.show, daemon=True).start()
+            if key == ord('d'):
+                self.show_debug = not self.show_debug
 
         self.cleanup()
 
     def process_frame(self, frame):
         self.hand_tracker.process_frame(frame)
 
-        self.left_hand_index = -1
-        self.right_hand_index = -1
+        self.right_hand_index = self.hand_tracker.get_mouse_hand_index()
+        self.left_hand_index = self.hand_tracker.get_click_hand_index()
         self.cursor_tip = None
-
-        for i in range(self.hand_tracker.get_hand_count()):
-            hand_type = self.hand_tracker.get_hand_type(i)
-            if hand_type == 'Left':
-                self.left_hand_index = i
-            elif hand_type == 'Right':
-                self.right_hand_index = i
+        self.hands_too_close = self.hand_tracker.hands_too_close
 
         any_hand = self.left_hand_index != -1 or self.right_hand_index != -1
 
         if self.right_hand_index != -1:
-            self._process_right_hand(frame)
+            self._process_mouse_hand(frame)
         else:
-            self.right_hand_was_moving = False
-            self.mouse_controller.pause_tracking()
+            self._reset_mouse_hand()
 
         if self.left_hand_index != -1:
-            self._process_left_hand(frame)
+            self._process_click_hand(frame)
+        else:
+            self._reset_click_hand()
 
         if not any_hand:
-            self._handle_no_hands(frame)
+            self._handle_no_hands()
         else:
             self.hand_was_detected = True
-            if self.mouse_locked:
-                self.mouse_locked = False
 
-        return frame
+        self._update_debug_info()
 
-    def _process_right_hand(self, frame):
+    def _process_mouse_hand(self, frame):
         live = self.hand_tracker.is_hand_live(self.right_hand_index)
         fingers = self.hand_tracker.get_fingers_status(self.right_hand_index)
         if not fingers:
             return
 
-        self.current_gesture_right = self.gesture_recognizer.recognize(fingers)
+        is_drag = self.hand_tracker.is_drag_gesture(self.right_hand_index)
+        can_move = self.hand_tracker.is_pointer_gesture(
+            self.right_hand_index, latched=self.movement_latched,
+        )
 
-        index_up = fingers[1]
-        others_up = fingers[2:]
-        is_moving = index_up and not any(others_up)
+        if is_drag:
+            self.current_gesture_right = "DRAG"
+        elif can_move:
+            self.current_gesture_right = "MOVING"
+        else:
+            self.current_gesture_right = self.gesture_recognizer.recognize(fingers)
 
-        if is_moving and live:
-            h, w, _ = frame.shape
+        h, w, _ = frame.shape
+
+        if is_drag and live:
+            if not self.drag_active:
+                self.mouse_controller.start_drag('left')
+                self.drag_active = True
             tip = self.hand_tracker.get_index_tip((h, w, 3), self.right_hand_index, live_only=True)
             if tip:
-                reanchor = not self.right_hand_was_moving
                 self.mouse_controller.move(
-                    tip[0], tip[1],
-                    self.frame_width, self.frame_height,
-                    reanchor=reanchor,
+                    tip[0], tip[1], self.frame_width, self.frame_height,
+                    reanchor=not self.movement_latched,
                 )
                 self.cursor_tip = tip
-                self.mouse_mode = "MOVING"
-        elif is_moving and not live:
+                self.movement_latched = True
+            self.mouse_mode = "DRAGGING"
+        elif is_drag:
             self.mouse_mode = "ANCHOR"
         else:
-            self.mouse_controller.pause_tracking()
-            if live:
-                self.mouse_mode = "READY"
+            if self.drag_active:
+                self.mouse_controller.stop_drag()
+                self.drag_active = False
 
-        self.right_hand_was_moving = is_moving and live
+            if can_move and live:
+                tip = self.hand_tracker.get_index_tip((h, w, 3), self.right_hand_index, live_only=True)
+                if tip:
+                    self.mouse_controller.move(
+                        tip[0], tip[1], self.frame_width, self.frame_height,
+                        reanchor=not self.movement_latched,
+                    )
+                    self.cursor_tip = tip
+                    self.movement_latched = True
+                self.mouse_mode = "MOVING"
+            elif can_move:
+                self.mouse_mode = "ANCHOR"
+            else:
+                self.movement_latched = False
+                self.mouse_controller.pause_tracking()
+                self.mouse_mode = "READY" if live else self.mouse_mode
 
         box = self.hand_tracker.get_bounding_box(self.right_hand_index)
         if box:
-            self._draw_hand_region(
-                frame, box, COLORS['box_right'],
-                "RIGHT", live,
-                self.current_gesture_right,
-            )
+            color = (0, 180, 255) if self.drag_active else COLORS['box_right']
+            self._draw_hand_region(frame, box, color, "MOUSE", live, self.current_gesture_right)
             if self.show_landmarks and live:
                 self.hand_tracker.draw_landmarks(frame, COLORS['cursor_point'], self.right_hand_index)
 
         if self.cursor_tip:
             self._draw_crosshair(frame, self.cursor_tip, COLORS['cursor_point'])
 
-    def _process_left_hand(self, frame):
+    def _process_click_hand(self, frame):
         live = self.hand_tracker.is_hand_live(self.left_hand_index)
         fingers = self.hand_tracker.get_click_fingers_status(self.left_hand_index)
         if not fingers:
             return
 
-        self.current_gesture_left = self.gesture_recognizer.recognize(fingers)
-        current_time = time.time()
+        _, index_up, middle_up, ring_up, pinky_up = fingers
+        now = time.time()
+        cooldown_ok = now - self.last_click_time > self.click_cooldown
+
+        # تشخیص مستقیم از وضعیت انگشت — ساده و قابل اعتماد
+        left_gesture = not index_up and middle_up
+        right_gesture = index_up and not middle_up
+        middle_gesture = not any([index_up, middle_up, ring_up, pinky_up])
+        double_gesture = not index_up and not middle_up and (ring_up or pinky_up)
+        scroll_gesture = not ring_up and index_up and middle_up and pinky_up
+
+        if left_gesture:
+            self.current_gesture_left = "LEFT CLICK"
+        elif right_gesture:
+            self.current_gesture_left = "RIGHT CLICK"
+        elif middle_gesture:
+            self.current_gesture_left = "MIDDLE CLICK"
+        elif double_gesture:
+            self.current_gesture_left = "DOUBLE CLICK"
+        elif scroll_gesture:
+            self.current_gesture_left = "SCROLL"
+        else:
+            self.current_gesture_left = self.gesture_recognizer.recognize_click_hand(fingers)
 
         if live:
-            index_up, middle_up = fingers[1], fingers[2]
-            cooldown_ok = current_time - self.last_click_time > self.click_cooldown
-
-            left_gesture = not index_up and middle_up
-            right_gesture = not middle_up and index_up
+            if scroll_gesture:
+                h, _, _ = frame.shape
+                center_y = self.hand_tracker.get_hand_center_y(self.left_hand_index, h)
+                if center_y is not None:
+                    self.mouse_controller.scroll(center_y, reanchor=not self.scroll_active)
+                    self.scroll_active = True
+                    self.mouse_mode = "SCROLLING"
+            elif self.scroll_active:
+                self.mouse_controller.stop_scroll()
+                self.scroll_active = False
 
             if left_gesture and not self.left_click_active and cooldown_ok:
-                if self.mouse_controller.click_left():
-                    self.last_click_time = current_time
-                    self.last_click_type = 'left'
-
+                self._fire_click('left', self.mouse_controller.click_left)
             if right_gesture and not self.right_click_active and cooldown_ok:
-                if self.mouse_controller.click_right():
-                    self.last_click_time = current_time
-                    self.last_click_type = 'right'
+                self._fire_click('right', self.mouse_controller.click_right)
+            if middle_gesture and not self.middle_click_active and cooldown_ok:
+                self._fire_click('middle', self.mouse_controller.click_middle)
+            if double_gesture and not self.double_click_active and cooldown_ok:
+                self._fire_click('double', self.mouse_controller.click_double)
 
             self.left_click_active = left_gesture
             self.right_click_active = right_gesture
+            self.middle_click_active = middle_gesture
+            self.double_click_active = double_gesture
         else:
             self.left_click_active = False
             self.right_click_active = False
+            self.middle_click_active = False
+            self.double_click_active = False
+            if self.scroll_active:
+                self.mouse_controller.stop_scroll()
+                self.scroll_active = False
 
         box = self.hand_tracker.get_bounding_box(self.left_hand_index)
         if box:
-            flash = current_time - self.last_click_time < 0.4
+            flash = now - self.last_click_time < 0.4
             if flash and self.last_click_type == 'left':
-                color = COLORS['box_click']
-                label = "LEFT CLICK"
+                color, label = COLORS['box_click'], "LEFT CLICK"
             elif flash and self.last_click_type == 'right':
-                color = (0, 165, 255)
-                label = "RIGHT CLICK"
+                color, label = (0, 165, 255), "RIGHT CLICK"
+            elif flash and self.last_click_type == 'middle':
+                color, label = (180, 180, 180), "MIDDLE CLICK"
+            elif flash and self.last_click_type == 'double':
+                color, label = (200, 100, 255), "DOUBLE CLICK"
+            elif self.scroll_active:
+                color, label = (200, 100, 200), "SCROLL"
             else:
-                color = COLORS['box_left']
-                label = self.current_gesture_left
+                color, label = COLORS['box_left'], self.current_gesture_left
 
-            self._draw_hand_region(frame, box, color, "LEFT", live, label)
-
+            self._draw_hand_region(frame, box, color, "CLICK", live, label)
             if self.show_landmarks and live:
                 self.hand_tracker.draw_landmarks(frame, color, self.left_hand_index)
 
-    def _handle_no_hands(self, frame):
-        if self.hand_was_detected and not self.mouse_locked:
-            self.mouse_locked = True
-            log_message("Mouse locked (no hands)")
+    def _fire_click(self, click_type, method):
+        method()
+        self.last_click_time = time.time()
+        self.last_click_type = click_type
 
+    def _reset_mouse_hand(self):
+        if self.drag_active:
+            self.mouse_controller.stop_drag()
+            self.drag_active = False
+        self.movement_latched = False
         self.mouse_controller.pause_tracking()
+        self.current_gesture_right = "WAITING"
+
+    def _reset_click_hand(self):
         self.left_click_active = False
         self.right_click_active = False
-        self.right_hand_was_moving = False
-        self.current_gesture_right = "WAITING"
+        self.middle_click_active = False
+        self.double_click_active = False
+        if self.scroll_active:
+            self.mouse_controller.stop_scroll()
+            self.scroll_active = False
         self.current_gesture_left = "WAITING"
+
+    def _handle_no_hands(self):
+        self._reset_mouse_hand()
+        self._reset_click_hand()
         self.mouse_mode = "LOCKED"
+
+    def _update_debug_info(self):
+        self.debug_info = [
+            f"Mouse: {self.right_hand_index}  Click: {self.left_hand_index}",
+            f"Mode: {self.mouse_mode}  L: {self.current_gesture_left}",
+        ]
+        if self.left_hand_index != -1:
+            f = self.hand_tracker.get_click_fingers_status(self.left_hand_index)
+            if f:
+                self.debug_info.append(f"Fingers: idx={f[1]} mid={f[2]} rng={f[3]} pnk={f[4]}")
 
     def _draw_hand_region(self, frame, box, color, hand_label, live, status):
         (x1, y1), (x2, y2) = box
         thickness = 2 if live else 1
-        line_type = cv2.LINE_AA
+        lt = cv2.LINE_AA
 
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            cv2.rectangle(frame, (x1 + dx, y1 + dy), (x2 + dx, y2 + dy), (0, 0, 0), thickness + 1, line_type)
+            cv2.rectangle(frame, (x1 + dx, y1 + dy), (x2 + dx, y2 + dy), (0, 0, 0), thickness + 1, lt)
 
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness, line_type)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness, lt)
 
         corner = 18
-        for cx, cy, sx, sy in [
-            (x1, y1, 1, 1), (x2, y1, -1, 1),
-            (x1, y2, 1, -1), (x2, y2, -1, -1),
-        ]:
-            cv2.line(frame, (cx, cy), (cx + sx * corner, cy), color, 3, line_type)
-            cv2.line(frame, (cx, cy), (cx, cy + sy * corner), color, 3, line_type)
+        for cx, cy, sx, sy in [(x1, y1, 1, 1), (x2, y1, -1, 1), (x1, y2, 1, -1), (x2, y2, -1, -1)]:
+            cv2.line(frame, (cx, cy), (cx + sx * corner, cy), color, 3, lt)
+            cv2.line(frame, (cx, cy), (cx, cy + sy * corner), color, 3, lt)
 
-        tag = f"{hand_label}" if live else f"{hand_label} (mem)"
-        cv2.putText(frame, tag, (x1, max(y1 - 8, 14)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, line_type)
-        cv2.putText(frame, status, (x1, y2 + 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, line_type)
+        tag = hand_label if live else f"{hand_label} (mem)"
+        cv2.putText(frame, tag, (x1, max(y1 - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, lt)
+        cv2.putText(frame, status, (x1, y2 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, lt)
 
     def _draw_crosshair(self, frame, tip, color):
         x, y = tip
@@ -349,8 +397,9 @@ class AirClick:
 
     def draw_overlay(self, frame):
         h, w = frame.shape[:2]
-        overlay = frame.copy()
+        frame = self._draw_hand_zones(frame)
 
+        overlay = frame.copy()
         cv2.rectangle(overlay, (0, 0), (w, 42), (10, 10, 20), -1)
         cv2.rectangle(overlay, (0, h - 48), (w, h), (10, 10, 20), -1)
         frame = cv2.addWeighted(overlay, 0.75, frame, 0.25, 0)
@@ -363,44 +412,77 @@ class AirClick:
             cv2.putText(frame, f"{fps:.0f} FPS", (w - 90, 28),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
 
-        cv2.putText(frame, "q:Exit  h:Help", (w - 130, 28),
+        cv2.putText(frame, "q:Exit  h:Help  d:Debug", (w - 160, 28),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 140), 1, cv2.LINE_AA)
 
         mode_colors = {
             "MOVING": (81, 207, 102),
+            "DRAGGING": (60, 180, 255),
             "READY": (79, 195, 247),
             "ANCHOR": (255, 200, 100),
+            "SCROLLING": (200, 100, 255),
             "LOCKED": (100, 100, 120),
         }
-        mode_color = mode_colors.get(self.mouse_mode, (150, 150, 150))
         cv2.putText(frame, f"Mode: {self.mouse_mode}", (14, h - 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, mode_color, 1, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, mode_colors.get(self.mouse_mode, (150, 150, 150)), 1, cv2.LINE_AA)
 
-        right_text = f"R: {self.current_gesture_right}"
-        left_text = f"L: {self.current_gesture_left}"
-        cv2.putText(frame, right_text, (180, h - 22),
+        cv2.putText(frame, f"R: {self.current_gesture_right}", (180, h - 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_right'], 1, cv2.LINE_AA)
-        cv2.putText(frame, left_text, (360, h - 22),
+        cv2.putText(frame, f"L: {self.current_gesture_left}", (360, h - 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_left'], 1, cv2.LINE_AA)
 
         if self.last_click_type and time.time() - self.last_click_time < 0.5:
-            click_label = "LEFT CLICK" if self.last_click_type == 'left' else "RIGHT CLICK"
-            click_color = COLORS['box_click'] if self.last_click_type == 'left' else (0, 165, 255)
-            cv2.putText(frame, click_label, (w - 160, h - 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, click_color, 1, cv2.LINE_AA)
+            labels = {'left': 'LEFT CLICK', 'right': 'RIGHT CLICK',
+                      'middle': 'MIDDLE CLICK', 'double': 'DOUBLE CLICK'}
+            colors = {'left': COLORS['box_click'], 'right': (0, 165, 255),
+                      'middle': (180, 180, 180), 'double': (200, 100, 255)}
+            cv2.putText(frame, labels.get(self.last_click_type, ''), (w - 160, h - 22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, colors.get(self.last_click_type, (255, 255, 255)), 1, cv2.LINE_AA)
 
         if self.mouse_mode == "LOCKED" and self.hand_was_detected:
-            cx, cy = w // 2, h // 2
-            cv2.putText(frame, "NO HANDS", (cx - 70, cy),
+            cv2.putText(frame, "NO HANDS", (w // 2 - 70, h // 2),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80, 80, 200), 2, cv2.LINE_AA)
-            cv2.putText(frame, "Mouse position preserved", (cx - 120, cy + 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 100, 140), 1, cv2.LINE_AA)
+
+        if self.hands_too_close:
+            cv2.putText(frame, "Hands too close - spread apart!", (w // 2 - 160, 62),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 80, 255), 2, cv2.LINE_AA)
+
+        if self.show_debug:
+            y = 58
+            for line in self.debug_info:
+                cv2.putText(frame, line, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 255, 255), 1, cv2.LINE_AA)
+                y += 18
+
+        return frame
+
+    def _draw_hand_zones(self, frame):
+        h, w = frame.shape[:2]
+        split_x = w // 2
+        zone_overlay = frame.copy()
+
+        cv2.rectangle(zone_overlay, (0, 42), (split_x, h - 48), (0, 60, 0), -1)
+        cv2.rectangle(zone_overlay, (split_x, 42), (w, h - 48), (0, 40, 80), -1)
+        frame = cv2.addWeighted(zone_overlay, 0.12, frame, 0.88, 0)
+
+        for y in range(42, h - 48, 16):
+            cv2.line(frame, (split_x, y), (split_x, min(y + 8, h - 48)), (180, 180, 200), 1, cv2.LINE_AA)
+
+        cv2.putText(frame, "MOUSE", (split_x // 2 - 35, 58),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_right'], 1, cv2.LINE_AA)
+        cv2.putText(frame, "CLICK", (split_x + split_x // 2 - 28, 58),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_left'], 1, cv2.LINE_AA)
+
+        if self.hand_tracker.hand_separation is not None:
+            sep_color = (0, 80, 255) if self.hands_too_close else (120, 120, 140)
+            cv2.putText(frame, f"Gap: {int(self.hand_tracker.hand_separation)}px",
+                        (split_x - 40, h - 58), cv2.FONT_HERSHEY_SIMPLEX, 0.4, sep_color, 1, cv2.LINE_AA)
 
         return frame
 
     def cleanup(self):
         log_message("Cleaning up...")
         try:
+            self.mouse_controller.reset()
             self.hand_tracker.release()
             self.cap.release()
             cv2.destroyAllWindows()

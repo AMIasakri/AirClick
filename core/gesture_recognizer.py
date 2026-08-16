@@ -33,13 +33,13 @@ class GestureRecognizer:
         if index and not middle and not ring and not pinky:
             return self.gesture_names['only_index']
         
-        # اشاره خم + وسط صاف - کلیک چپ
+        # اشاره خم + بقیه بالا - کلیک چپ
         if not index and middle and not ring and not pinky:
             return self.gesture_names['index_folded_middle_open']
         
-        # اشاره + وسط - کلیک راست
-        if index and middle and not ring and not pinky:
-            return self.gesture_names['index_middle_open']
+        # وسط خم + اشاره بالا - کلیک راست
+        if index and not middle:
+            return self.gesture_names['middle_folded_index_open']
         
         # مشت - کلیک وسط
         if not any(fingers):
@@ -54,7 +54,10 @@ class GestureRecognizer:
         return gesture == self.gesture_names['index_folded_middle_open']
     
     def is_right_click(self, gesture):
-        return gesture == self.gesture_names['index_middle_open']
+        return gesture in (
+            self.gesture_names['middle_folded_index_open'],
+            self.gesture_names['index_middle_open'],
+        )
     
     def is_middle_click(self, gesture):
         return gesture == self.gesture_names['fist']

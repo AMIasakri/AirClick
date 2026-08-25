@@ -3,8 +3,20 @@
 """
 
 import math
+import sys
 import cv2
 from datetime import datetime
+
+
+def _ensure_utf8_stdout():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_ensure_utf8_stdout()
 
 
 def calculate_distance(point1, point2):
@@ -30,7 +42,11 @@ def get_bounding_box(landmarks, w, h, padding=20):
 
 def log_message(message, level="INFO"):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] [{level}] {message}")
+    line = f"[{timestamp}] [{level}] {message}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.encode("ascii", errors="replace").decode("ascii"))
 
 
 def get_fps(start_time, frame_count):

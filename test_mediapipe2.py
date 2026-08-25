@@ -6,7 +6,10 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-import numpy as np
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(PROJECT_ROOT, 'hand_landmarker.task')
 
 print("✅ MediaPipe version:", mp.__version__)
 print("✅ Available modules:", dir(mp))
@@ -24,7 +27,7 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 # تنظیمات تشخیص دست
-base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.HandLandmarkerOptions(base_options=base_options,
                                        num_hands=1)
 detector = vision.HandLandmarker.create_from_options(options)

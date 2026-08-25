@@ -180,6 +180,11 @@ class AirClick:
         self._update_debug_info()
 
     def _process_mouse_hand(self, frame):
+        if self.hands_too_close:
+            self._reset_mouse_hand()
+            self.mouse_mode = "LOCKED"
+            return
+
         live = self.hand_tracker.is_hand_live(self.right_hand_index)
         fingers = self.hand_tracker.get_fingers_status(self.right_hand_index)
         if not fingers:
@@ -247,37 +252,22 @@ class AirClick:
             self._draw_crosshair(frame, self.cursor_tip, COLORS['cursor_point'])
 
     def _process_click_hand(self, frame):
+        if self.hands_too_close:
+            self._reset_click_hand()
+            return
+
         live = self.hand_tracker.is_hand_live(self.left_hand_index)
         fingers = self.hand_tracker.get_click_fingers_status(self.left_hand_index)
         if not fingers:
             return
 
-        _, index_up, middle_up, ring_up, pinky_up = fingers
+        gesture = self.gesture_recognizer.recognize_click_hand(fingers)
+        self.current_gesture_left = gesture
         now = time.time()
         cooldown_ok = now - self.last_click_time > self.click_cooldown
 
-        # تشخیص مستقیم از وضعیت انگشت — ساده و قابل اعتماد
-        left_gesture = not index_up and middle_up
-        right_gesture = index_up and not middle_up
-        middle_gesture = not any([index_up, middle_up, ring_up, pinky_up])
-        double_gesture = not index_up and not middle_up and (ring_up or pinky_up)
-        scroll_gesture = not ring_up and index_up and middle_up and pinky_up
-
-        if left_gesture:
-            self.current_gesture_left = "LEFT CLICK"
-        elif right_gesture:
-            self.current_gesture_left = "RIGHT CLICK"
-        elif middle_gesture:
-            self.current_gesture_left = "MIDDLE CLICK"
-        elif double_gesture:
-            self.current_gesture_left = "DOUBLE CLICK"
-        elif scroll_gesture:
-            self.current_gesture_left = "SCROLL"
-        else:
-            self.current_gesture_left = self.gesture_recognizer.recognize_click_hand(fingers)
-
         if live:
-            if scroll_gesture:
+            if self.gesture_recognizer.is_scroll(gesture):
                 h, _, _ = frame.shape
                 center_y = self.hand_tracker.get_hand_center_y(self.left_hand_index, h)
                 if center_y is not None:
@@ -288,19 +278,19 @@ class AirClick:
                 self.mouse_controller.stop_scroll()
                 self.scroll_active = False
 
-            if left_gesture and not self.left_click_active and cooldown_ok:
+            if self.gesture_recognizer.is_left_click(gesture) and not self.left_click_active and cooldown_ok:
                 self._fire_click('left', self.mouse_controller.click_left)
-            if right_gesture and not self.right_click_active and cooldown_ok:
+            if self.gesture_recognizer.is_right_click(gesture) and not self.right_click_active and cooldown_ok:
                 self._fire_click('right', self.mouse_controller.click_right)
-            if middle_gesture and not self.middle_click_active and cooldown_ok:
+            if self.gesture_recognizer.is_middle_click(gesture) and not self.middle_click_active and cooldown_ok:
                 self._fire_click('middle', self.mouse_controller.click_middle)
-            if double_gesture and not self.double_click_active and cooldown_ok:
+            if self.gesture_recognizer.is_double_click(gesture) and not self.double_click_active and cooldown_ok:
                 self._fire_click('double', self.mouse_controller.click_double)
 
-            self.left_click_active = left_gesture
-            self.right_click_active = right_gesture
-            self.middle_click_active = middle_gesture
-            self.double_click_active = double_gesture
+            self.left_click_active = self.gesture_recognizer.is_left_click(gesture)
+            self.right_click_active = self.gesture_recognizer.is_right_click(gesture)
+            self.middle_click_active = self.gesture_recognizer.is_middle_click(gesture)
+            self.double_click_active = self.gesture_recognizer.is_double_click(gesture)
         else:
             self.left_click_active = False
             self.right_click_active = False

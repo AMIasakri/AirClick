@@ -9,6 +9,15 @@ pip install -r requirements.txt
 python main.py
 ```
 
+> در اولین اجرا، مدل MediaPipe (`hand_landmarker.task`) به‌صورت خودکار دانلود می‌شود.
+
+## تست
+
+```bash
+python test_setup.py
+python tests/test_gestures.py
+```
+
 ## ژست‌ها
 
 | دست | ژست | عمل |

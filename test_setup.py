@@ -1,71 +1,61 @@
 """
-تست اولیه‌ی پروژه AirClick
-بررسی نصب کتابخونه‌ها و تنظیمات اولیه
+تست اولیه پروژه AirClick
+بررسی نصب کتابخانه‌ها و تنظیمات اولیه
 """
 
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import cv2
 import mediapipe as mp
 import pyautogui
 
-print("=" * 50)
-print("🧪 تست اولیه‌ی AirClick")
-print("=" * 50)
+from utils.helpers import log_message
 
-# 1. تست Python
-print(f"\n✅ Python version: {sys.version}")
 
-# 2. تست OpenCV
-try:
-    print(f"✅ OpenCV version: {cv2.__version__}")
-except:
-    print("❌ OpenCV نصب نیست!")
-    sys.exit(1)
+def main():
+    log_message("=" * 50)
+    log_message("AirClick setup test")
+    log_message("=" * 50)
 
-# 3. تست MediaPipe
-try:
-    print(f"✅ MediaPipe version: {mp.__version__}")
-except:
-    print("❌ MediaPipe نصب نیست!")
-    sys.exit(1)
+    log_message(f"Python version: {sys.version}")
+    log_message(f"OpenCV version: {cv2.__version__}")
+    log_message(f"MediaPipe version: {mp.__version__}")
 
-# 4. تست PyAutoGUI
-try:
     screen_width, screen_height = pyautogui.size()
-    print(f"✅ PyAutoGUI نصب است! صفحه‌نمایش: {screen_width}x{screen_height}")
-except:
-    print("❌ PyAutoGUI نصب نیست!")
-    sys.exit(1)
+    log_message(f"PyAutoGUI OK — screen: {screen_width}x{screen_height}")
 
-# 5. تست دوربین
-print("\n📹 در حال تست دوربین...")
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    print("❌ دوربین پیدا نشد! لطفاً دوربین را بررسی کنید.")
-    sys.exit(1)
-else:
-    print("✅ دوربین پیدا شد!")
+    log_message("Testing camera...")
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        log_message("Camera not found!", "ERROR")
+        sys.exit(1)
+    log_message("Camera OK")
     cap.release()
 
-# 6. تست ساختار پوشه‌ها
-import os
-folders = ['core', 'utils', 'config', 'logs', 'assets']
-print("\n📁 بررسی ساختار پوشه‌ها:")
-for folder in folders:
-    if os.path.exists(folder):
-        print(f"  ✅ {folder}/")
-    else:
-        print(f"  ❌ {folder}/ وجود ندارد!")
+    folders = ['core', 'utils', 'config', 'ui', 'tests']
+    log_message("Checking project structure:")
+    missing = [f for f in folders if not os.path.exists(f)]
+    for folder in folders:
+        status = "OK" if folder not in missing else "MISSING"
+        log_message(f"  {folder}/ — {status}")
 
-# 7. تست فایل‌های اصلی
-files = ['main.py', 'requirements.txt', 'README.md']
-print("\n📄 بررسی فایل‌های اصلی:")
-for file in files:
-    if os.path.exists(file):
-        print(f"  ✅ {file}")
-    else:
-        print(f"  ❌ {file} وجود ندارد!")
+    files = ['main.py', 'requirements.txt', 'README.md']
+    log_message("Checking main files:")
+    for file in files:
+        status = "OK" if os.path.exists(file) else "MISSING"
+        log_message(f"  {file} — {status}")
 
-print("\n" + "=" * 50)
-print("✅ همه‌چیز آماده است! می‌توانید پروژه را شروع کنید.")
-print("=" * 50)
+    if missing:
+        log_message("Some folders are missing.", "ERROR")
+        sys.exit(1)
+
+    log_message("=" * 50)
+    log_message("Setup test passed. Run: python main.py")
+    log_message("=" * 50)
+
+
+if __name__ == "__main__":
+    main()

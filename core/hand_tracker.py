@@ -27,11 +27,12 @@ class HandTracker:
         self.max_num_hands = MEDIAPIPE_SETTINGS['max_num_hands']
         self.min_detection_confidence = MEDIAPIPE_SETTINGS['min_detection_confidence']
         self.min_tracking_confidence = MEDIAPIPE_SETTINGS['min_tracking_confidence']
-        
-        model_path = 'hand_landmarker.task'
+
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        model_path = os.path.join(self.project_root, 'hand_landmarker.task')
         if not os.path.exists(model_path):
-            log_message("⚠️ مدل پیدا نشد! در حال دانلود...")
-            self._download_model()
+            log_message("Model not found — downloading...")
+            self._download_model(model_path)
         
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.HandLandmarkerOptions(
@@ -82,12 +83,12 @@ class HandTracker:
         
         log_message("HandTracker ready")
     
-    def _download_model(self):
+    def _download_model(self, model_path):
         import urllib.request
         url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        log_message(f"📥 در حال دانلود مدل...")
-        urllib.request.urlretrieve(url, 'hand_landmarker.task')
-        log_message("✅ مدل دانلود شد!")
+        log_message("Downloading hand landmarker model...")
+        urllib.request.urlretrieve(url, model_path)
+        log_message("Model downloaded.")
     
     def _enhance_frame(self, frame):
         """بهبود کیفیت تصویر"""

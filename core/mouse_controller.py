@@ -28,6 +28,7 @@ class MouseController:
         self.scroll_speed = MOUSE_SETTINGS.get('scroll_speed', 3)
         self.scroll_dead_zone = MOUSE_SETTINGS.get('scroll_dead_zone', 8)
         self.double_click_interval = MOUSE_SETTINGS.get('double_click_interval', 0.35)
+        self.menu_mode_dead_zone = MOUSE_SETTINGS.get('menu_mode_dead_zone', 1)
 
         self.screen_width, self.screen_height = pyautogui.size()
         self.current_x = self.screen_width // 2
@@ -49,18 +50,21 @@ class MouseController:
         self.last_action_time = 0
         self.last_click_time = 0
         self.pending_single_click = False
+        self.menu_mode = False
 
         pyautogui.FAILSAFE = False
         pyautogui.MINIMUM_DURATION = 0.01
         log_message(f"Screen: {self.screen_width}x{self.screen_height}")
         log_message("MouseController ready")
 
-    def move(self, tip_x, tip_y, frame_width, frame_height, reanchor=False):
+    def move(self, tip_x, tip_y, frame_width, frame_height, reanchor=False, menu_mode=False):
         if self.relative_mode:
-            return self._move_relative(tip_x, tip_y, frame_width, frame_height, reanchor)
+            return self._move_relative(
+                tip_x, tip_y, frame_width, frame_height, reanchor, menu_mode=menu_mode,
+            )
         return self._move_absolute(tip_x, tip_y, frame_width, frame_height)
 
-    def _move_relative(self, tip_x, tip_y, frame_width, frame_height, reanchor=False):
+    def _move_relative(self, tip_x, tip_y, frame_width, frame_height, reanchor=False, menu_mode=False):
         if reanchor or not self.tracking_active:
             self.last_tip_x = tip_x
             self.last_tip_y = tip_y
@@ -72,7 +76,8 @@ class MouseController:
         self.last_tip_x = tip_x
         self.last_tip_y = tip_y
 
-        if abs(dx) < self.dead_zone and abs(dy) < self.dead_zone:
+        dead_zone = self.menu_mode_dead_zone if menu_mode else self.dead_zone
+        if abs(dx) < dead_zone and abs(dy) < dead_zone:
             return self.current_x, self.current_y
 
         scale_x = (self.screen_width / frame_width) * self.movement_speed
@@ -194,6 +199,9 @@ class MouseController:
 
     def get_position(self):
         return self.current_x, self.current_y
+
+    def set_menu_mode(self, active):
+        self.menu_mode = active
 
     def _can_act(self):
         return time.time() - self.last_action_time >= self.action_cooldown

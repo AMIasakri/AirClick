@@ -13,7 +13,7 @@ from collections import deque
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import MEDIAPIPE_SETTINGS, HAND_SETTINGS
+from config.settings import MEDIAPIPE_SETTINGS, HAND_SETTINGS, DISPLAY_SETTINGS
 from utils.helpers import log_message
 import math
 
@@ -127,8 +127,11 @@ class HandTracker:
     
     def process_frame(self, frame):
         """پردازش فریم با حافظه"""
-        enhanced_frame = self._enhance_frame(frame)
-        rgb = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
+        if HAND_SETTINGS.get('enhance_frame', False):
+            detect_frame = self._enhance_frame(frame)
+        else:
+            detect_frame = frame
+        rgb = cv2.cvtColor(detect_frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         detection_result = self.detector.detect(mp_image)
         
@@ -353,7 +356,7 @@ class HandTracker:
         if latched and HAND_SETTINGS['movement_latch']:
             return tip.y < mcp.y + bend_limit
 
-        return tip.y < pip.y + 0.006 and tip.y < mcp.y + bend_limit * 0.7
+        return tip.y < pip.y + 0.014 and tip.y < mcp.y + bend_limit
 
     def is_drag_gesture(self, index):
         """V sign — اشاره و وسط بالا"""
@@ -396,47 +399,55 @@ class HandTracker:
     
     def _finger_extended(self, landmarks, tip_id, pip_id, margin=0.01):
         return landmarks[tip_id].y < landmarks[pip_id].y - margin
-    
+
+    def _finger_folded_lenient(self, landmarks, tip_id, pip_id, mcp_id=None):
+        tip = landmarks[tip_id]
+        pip = landmarks[pip_id]
+        if tip.y >= pip.y - 0.012:
+            return True
+        if mcp_id is not None and tip.y >= landmarks[mcp_id].y - 0.018:
+            return True
+        return False
+
     def get_click_fingers_status(self, index=0):
         """وضعیت انگشتان با حساسیت بهتر برای کلیک"""
         landmarks = self.get_landmarks(index)
         if not landmarks:
             cached = self.get_fingers_status(index)
             return cached if cached else [True, True, True, True, True]
-        
-        return [
-            True,
-            self._finger_extended(landmarks, 8, 6, margin=0.010),
-            self._finger_extended(landmarks, 12, 10, margin=0.014),
-            self._finger_extended(landmarks, 16, 14, margin=0.008),
-            self._finger_extended(landmarks, 20, 18, margin=0.008),
-        ]
+
+        index_up = not self._finger_folded_lenient(landmarks, 8, 6, 5)
+        middle_up = self._finger_extended(landmarks, 12, 10, margin=0.008)
+        ring_up = self._finger_extended(landmarks, 16, 14, margin=0.006)
+        pinky_up = self._finger_extended(landmarks, 20, 18, margin=0.006)
+
+        return [True, index_up, middle_up, ring_up, pinky_up]
     
     def get_hand_count(self):
         return len(self.hands_detected)
     
     def get_landmarks(self, index=0):
-        if index < len(self.all_landmarks):
+        if 0 <= index < len(self.all_landmarks):
             return self.all_landmarks[index]
         return None
     
     def get_bounding_box(self, index=0):
-        if index < len(self.all_bounding_boxes):
+        if 0 <= index < len(self.all_bounding_boxes):
             return self.all_bounding_boxes[index]
         return None
     
     def get_fingers_status(self, index=0):
-        if index < len(self.all_fingers_status):
+        if 0 <= index < len(self.all_fingers_status):
             return self.all_fingers_status[index]
         return None
     
     def get_hand_type(self, index=0):
-        if index < len(self.hand_types):
+        if 0 <= index < len(self.hand_types):
             return self.hand_types[index]
         return 'Unknown'
     
     def is_hand_live(self, index=0):
-        if index < len(self.hand_is_live):
+        if 0 <= index < len(self.hand_is_live):
             return self.hand_is_live[index]
         return False
     
@@ -460,7 +471,7 @@ class HandTracker:
         
         return None
     
-    def draw_landmarks(self, frame, color=(0, 255, 255), index=0):
+    def draw_landmarks(self, frame, color=(0, 255, 255), index=0, show_mesh=True):
         landmarks = self.get_landmarks(index)
         if not landmarks:
             # اگر لندمارک نداشت، یک نقطه ساده بکش
@@ -472,25 +483,56 @@ class HandTracker:
         
         h, w, _ = frame.shape
         
-        for lm in landmarks:
-            cx, cy = int(lm.x * w), int(lm.y * h)
-            cv2.circle(frame, (cx, cy), 5, color, -1)
-            cv2.circle(frame, (cx, cy), 5, (255, 255, 255), 1)
-        
         connections = [
             (0,1), (1,2), (2,3), (3,4),
             (0,5), (5,6), (6,7), (7,8),
             (0,9), (9,10), (10,11), (11,12),
             (0,13), (13,14), (14,15), (15,16),
             (0,17), (17,18), (18,19), (19,20),
-            (5,9), (9,13), (13,17)
+            (5,9), (9,13), (13,17),
         ]
+        palm_mesh = [
+            (0,9), (0,13), (0,17),
+            (5,13), (9,17),
+            (6,10), (10,14), (14,18),
+            (7,11), (11,15), (15,19),
+        ]
+
+        points = [
+            (max(0, min(w - 1, int(lm.x * w))),
+             max(0, min(h - 1, int(lm.y * h))))
+            for lm in landmarks
+        ]
+        mesh_color = tuple(min(255, int(channel * 0.65 + 90)) for channel in color)
+        thickness = max(1, int(DISPLAY_SETTINGS.get('mesh_line_thickness', 2)))
+        visible_mesh = connections + palm_mesh if show_mesh else connections
+        glow = np.zeros_like(frame)
+        for i, j in visible_mesh:
+            cv2.line(glow, points[i], points[j], mesh_color, thickness + 3, cv2.LINE_AA)
+        glow = cv2.GaussianBlur(glow, (0, 0), 5)
+        cv2.addWeighted(
+            frame, 1.0, glow,
+            float(DISPLAY_SETTINGS.get('mesh_glow_strength', 0.28)), 0, frame,
+        )
+
         for i, j in connections:
-            x1, y1 = int(landmarks[i].x * w), int(landmarks[i].y * h)
-            x2, y2 = int(landmarks[j].x * w), int(landmarks[j].y * h)
-            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
+            cv2.line(frame, points[i], points[j], (8, 8, 16), thickness + 2, cv2.LINE_AA)
+            cv2.line(frame, points[i], points[j], color, thickness, cv2.LINE_AA)
+        if show_mesh:
+            for i, j in palm_mesh:
+                cv2.line(frame, points[i], points[j], mesh_color, thickness, cv2.LINE_AA)
+
+        for idx, point in enumerate(points):
+            radius = 4 if idx in {4, 8, 12, 16, 20} else 3
+            cv2.circle(frame, point, radius + 1, (10, 10, 18), -1, cv2.LINE_AA)
+            cv2.circle(frame, point, radius, color, -1, cv2.LINE_AA)
+            cv2.circle(frame, point, radius, (235, 235, 245), 1, cv2.LINE_AA)
         
         return frame
     
     def release(self):
+        close = getattr(self.detector, 'close', None)
+        if close:
+            close()
+        self.detector = None
         log_message("HandTracker released")

@@ -4,6 +4,7 @@
 
 import sys
 import os
+from collections import Counter
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -58,7 +59,7 @@ class GestureRecognizer:
         if not index and not middle:
             return self.gesture_names['index_middle_folded']
 
-        if not index and middle and not ring and not pinky:
+        if not index and middle:
             return self.gesture_names['index_folded_middle_open']
 
         if index and not middle:
@@ -95,3 +96,29 @@ class GestureRecognizer:
 
     def is_ready(self, gesture):
         return gesture == self.gesture_names['all_open']
+
+
+class GestureStabilizer:
+    """Require a gesture to persist for several frames before accepting it."""
+
+    def __init__(self, required_frames=3):
+        if required_frames < 1:
+            raise ValueError("required_frames must be positive")
+        self.required_frames = required_frames
+        self._history = []
+        self.stable_gesture = None
+
+    def update(self, gesture):
+        self._history.append(gesture)
+        if len(self._history) > self.required_frames:
+            self._history.pop(0)
+
+        if len(self._history) == self.required_frames:
+            candidate, count = Counter(self._history).most_common(1)[0]
+            if count == self.required_frames:
+                self.stable_gesture = candidate
+        return self.stable_gesture
+
+    def reset(self):
+        self._history.clear()
+        self.stable_gesture = None

@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import CAMERA_SETTINGS, DISPLAY_SETTINGS, COLORS, MOUSE_SETTINGS
 from core.hand_tracker import HandTracker
-from core.gesture_recognizer import GestureRecognizer
+from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
 from utils.helpers import log_message, get_fps
 
@@ -78,6 +78,9 @@ class AirClick:
 
         self.hand_tracker = HandTracker()
         self.gesture_recognizer = GestureRecognizer()
+        self.click_gesture_stabilizer = GestureStabilizer(
+            MOUSE_SETTINGS.get('gesture_stability_frames', 3),
+        )
         self.mouse_controller = MouseController()
 
         self.frame_width = CAMERA_SETTINGS['frame_width']
@@ -130,27 +133,29 @@ class AirClick:
         cv2.resizeWindow("AirClick", win_w, win_h)
         cv2.setWindowProperty("AirClick", cv2.WND_PROP_TOPMOST, 1)
 
-        while self.running:
-            ret, frame = self.cap.read()
-            if not ret:
-                break
+        try:
+            while self.running:
+                ret, frame = self.cap.read()
+                if not ret:
+                    log_message("Could not read a frame from the camera.", "ERROR")
+                    break
 
-            frame = cv2.flip(frame, 1)
-            self.process_frame(frame)
-            display = self.draw_overlay(frame)
+                frame = cv2.flip(frame, 1)
+                self.process_frame(frame)
+                display = self.draw_overlay(frame)
 
-            cv2.imshow("AirClick", display)
-            self.frame_count += 1
+                cv2.imshow("AirClick", display)
+                self.frame_count += 1
 
-            key = cv2.waitKey(1) & 0xFF
-            if key in (ord('q'), 27):
-                break
-            if key == ord('h'):
-                threading.Thread(target=HelpWindow.show, daemon=True).start()
-            if key == ord('d'):
-                self.show_debug = not self.show_debug
-
-        self.cleanup()
+                key = cv2.waitKey(1) & 0xFF
+                if key in (ord('q'), 27):
+                    break
+                if key == ord('h'):
+                    threading.Thread(target=HelpWindow.show, daemon=True).start()
+                if key == ord('d'):
+                    self.show_debug = not self.show_debug
+        finally:
+            self.cleanup()
 
     def process_frame(self, frame):
         self.hand_tracker.process_frame(frame)
@@ -211,7 +216,7 @@ class AirClick:
             tip = self.hand_tracker.get_index_tip((h, w, 3), self.right_hand_index, live_only=True)
             if tip:
                 self.mouse_controller.move(
-                    tip[0], tip[1], self.frame_width, self.frame_height,
+                    tip[0], tip[1], w, h,
                     reanchor=not self.movement_latched,
                 )
                 self.cursor_tip = tip
@@ -228,7 +233,7 @@ class AirClick:
                 tip = self.hand_tracker.get_index_tip((h, w, 3), self.right_hand_index, live_only=True)
                 if tip:
                     self.mouse_controller.move(
-                        tip[0], tip[1], self.frame_width, self.frame_height,
+                        tip[0], tip[1], w, h,
                         reanchor=not self.movement_latched,
                     )
                     self.cursor_tip = tip
@@ -246,7 +251,10 @@ class AirClick:
             color = (0, 180, 255) if self.drag_active else COLORS['box_right']
             self._draw_hand_region(frame, box, color, "MOUSE", live, self.current_gesture_right)
             if self.show_landmarks and live:
-                self.hand_tracker.draw_landmarks(frame, COLORS['cursor_point'], self.right_hand_index)
+                self.hand_tracker.draw_landmarks(
+                    frame, COLORS['cursor_point'], self.right_hand_index,
+                    show_mesh=DISPLAY_SETTINGS.get('show_hand_mesh', True),
+                )
 
         if self.cursor_tip:
             self._draw_crosshair(frame, self.cursor_tip, COLORS['cursor_point'])
@@ -261,7 +269,8 @@ class AirClick:
         if not fingers:
             return
 
-        gesture = self.gesture_recognizer.recognize_click_hand(fingers)
+        raw_gesture = self.gesture_recognizer.recognize_click_hand(fingers)
+        gesture = self.click_gesture_stabilizer.update(raw_gesture) or raw_gesture
         self.current_gesture_left = gesture
         now = time.time()
         cooldown_ok = now - self.last_click_time > self.click_cooldown
@@ -292,6 +301,7 @@ class AirClick:
             self.middle_click_active = self.gesture_recognizer.is_middle_click(gesture)
             self.double_click_active = self.gesture_recognizer.is_double_click(gesture)
         else:
+            self.click_gesture_stabilizer.reset()
             self.left_click_active = False
             self.right_click_active = False
             self.middle_click_active = False
@@ -318,7 +328,10 @@ class AirClick:
 
             self._draw_hand_region(frame, box, color, "CLICK", live, label)
             if self.show_landmarks and live:
-                self.hand_tracker.draw_landmarks(frame, color, self.left_hand_index)
+                self.hand_tracker.draw_landmarks(
+                    frame, color, self.left_hand_index,
+                    show_mesh=DISPLAY_SETTINGS.get('show_hand_mesh', True),
+                )
 
     def _fire_click(self, click_type, method):
         method()
@@ -334,6 +347,7 @@ class AirClick:
         self.current_gesture_right = "WAITING"
 
     def _reset_click_hand(self):
+        self.click_gesture_stabilizer.reset()
         self.left_click_active = False
         self.right_click_active = False
         self.middle_click_active = False
@@ -471,6 +485,7 @@ class AirClick:
 
     def cleanup(self):
         log_message("Cleaning up...")
+        self.running = False
         try:
             self.mouse_controller.reset()
             self.hand_tracker.release()

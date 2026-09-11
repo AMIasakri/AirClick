@@ -440,30 +440,6 @@ class AirClick:
         }
         return self.overlay_renderer.render(frame, state)
 
-    def _draw_hand_zones(self, frame):
-        h, w = frame.shape[:2]
-        split_x = w // 2
-        zone_overlay = frame.copy()
-
-        cv2.rectangle(zone_overlay, (0, 42), (split_x, h - 48), (0, 60, 0), -1)
-        cv2.rectangle(zone_overlay, (split_x, 42), (w, h - 48), (0, 40, 80), -1)
-        frame = cv2.addWeighted(zone_overlay, 0.12, frame, 0.88, 0)
-
-        for y in range(42, h - 48, 16):
-            cv2.line(frame, (split_x, y), (split_x, min(y + 8, h - 48)), (180, 180, 200), 1, cv2.LINE_AA)
-
-        cv2.putText(frame, "MOUSE", (split_x // 2 - 35, 58),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_right'], 1, cv2.LINE_AA)
-        cv2.putText(frame, "CLICK", (split_x + split_x // 2 - 28, 58),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_left'], 1, cv2.LINE_AA)
-
-        if self.hand_tracker.hand_separation is not None:
-            sep_color = (0, 80, 255) if self.hands_too_close else (120, 120, 140)
-            cv2.putText(frame, f"Gap: {int(self.hand_tracker.hand_separation)}px",
-                        (split_x - 40, h - 58), cv2.FONT_HERSHEY_SIMPLEX, 0.4, sep_color, 1, cv2.LINE_AA)
-
-        return frame
-
     def cleanup(self):
         log_message("Cleaning up...")
         self.running = False

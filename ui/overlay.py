@@ -55,7 +55,7 @@ class OverlayRenderer:
         x2, y2 = x + tw + pad_x * 2, y + pad_y
         sub = frame.copy()
         cv2.rectangle(sub, (x1, y1), (x2, y2), color, -1, cv2.LINE_AA)
-        cv2.addWeighted(sub, 0.25, frame, 0.75, 0, frame)
+        cv2.addWeighted(sub, 0.16, frame, 0.84, 0, frame)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1, cv2.LINE_AA)
         cv2.putText(frame, text, (x + pad_x, y), cv2.FONT_HERSHEY_SIMPLEX,
                     scale, COLORS['text_primary'], 1, cv2.LINE_AA)
@@ -63,7 +63,7 @@ class OverlayRenderer:
     def draw_hand_box(self, frame, box, color, hand_label, status, live=True):
         (x1, y1), (x2, y2) = box
         pulse = 0.5 + 0.5 * math.sin(self.pulse_phase)
-        thickness = 2 if live else 1
+        thickness = 1 if live else 1
         glow = tuple(int(c * (0.7 + 0.3 * pulse)) for c in color) if live else color
 
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -77,14 +77,14 @@ class OverlayRenderer:
             (x1, y1, 1, 1), (x2, y1, -1, 1),
             (x1, y2, 1, -1), (x2, y2, -1, -1),
         ]:
-            cv2.line(frame, (cx, cy), (cx + sx * corner, cy), color, 3, cv2.LINE_AA)
-            cv2.line(frame, (cx, cy), (cx, cy + sy * corner), color, 3, cv2.LINE_AA)
+            cv2.line(frame, (cx, cy), (cx + sx * corner, cy), color, 2, cv2.LINE_AA)
+            cv2.line(frame, (cx, cy), (cx, cy + sy * corner), color, 2, cv2.LINE_AA)
 
         tag = hand_label if live else f"{hand_label} (mem)"
         cv2.putText(frame, tag, (x1, max(y1 - 10, 16)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, color, 1, cv2.LINE_AA)
-        cv2.putText(frame, status, (x1, y2 + 18),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, glow, 1, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
+        cv2.putText(frame, status, (x1, y2 + 16),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.36, glow, 1, cv2.LINE_AA)
 
     def draw_crosshair(self, frame, tip, color):
         x, y = tip
@@ -140,68 +140,40 @@ class OverlayRenderer:
 
     def draw_header(self, frame, fps=None):
         h, w = frame.shape[:2]
-        frame = self.draw_panel(frame, 0, 0, w, 52, alpha=0.78, border_color=COLORS['panel_border'])
+        frame = self.draw_panel(frame, 0, 0, w, 48, alpha=0.86, border_color=COLORS['panel_border'])
 
-        cv2.putText(frame, "AIRCLICK PRO", (18, 34),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.78, COLORS['accent'], 2, cv2.LINE_AA)
+        cv2.putText(frame, "AIRCLICK PRO", (18, 31),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.68, COLORS['accent'], 2, cv2.LINE_AA)
 
-        cv2.line(frame, (200, 14), (200, 38), COLORS['panel_border'], 1, cv2.LINE_AA)
-        cv2.putText(frame, "Hand Control System", (212, 32),
+        cv2.line(frame, (190, 13), (190, 35), COLORS['panel_border'], 1, cv2.LINE_AA)
+        cv2.putText(frame, "HAND CONTROL", (202, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLORS['text_muted'], 1, cv2.LINE_AA)
 
         if fps is not None:
-            self.draw_pill(frame, f"{fps:.0f} FPS", w - 110, 32, COLORS['success'])
+            self.draw_pill(frame, f"{fps:.0f} FPS", w - 92, 30, COLORS['success'], scale=0.36)
 
-        cv2.putText(frame, "q:Exit  h:Help  d:Debug", (w - 210, 34),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, COLORS['text_muted'], 1, cv2.LINE_AA)
+        cv2.putText(frame, "Q  H  D", (w - 52, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.34, COLORS['text_muted'], 1, cv2.LINE_AA)
         return frame
 
     def draw_footer(self, frame, mode, mode_color, right_gesture, left_gesture,
                     hand_separation=None, hands_too_close=False):
         h, w = frame.shape[:2]
-        frame = self.draw_panel(frame, 0, h - 56, w, h, alpha=0.78, border_color=COLORS['panel_border'])
+        frame = self.draw_panel(frame, 0, h - 50, w, h, alpha=0.86, border_color=COLORS['panel_border'])
 
-        self.draw_pill(frame, f"Mode: {mode}", 14, h - 18, mode_color, scale=0.44)
-        self.draw_pill(frame, f"R: {right_gesture}", 170, h - 18, COLORS['box_right'], scale=0.40)
-        self.draw_pill(frame, f"L: {left_gesture}", 360, h - 18, COLORS['box_left'], scale=0.40)
+        self.draw_pill(frame, f"Mode  {mode}", 14, h - 16, mode_color, scale=0.38)
+        self.draw_pill(frame, f"R  {right_gesture}", 150, h - 16, COLORS['box_right'], scale=0.36)
+        self.draw_pill(frame, f"L  {left_gesture}", 326, h - 16, COLORS['box_left'], scale=0.36)
 
         if hand_separation is not None:
             sep_color = COLORS['danger'] if hands_too_close else COLORS['text_muted']
-            cv2.putText(frame, f"Gap: {int(hand_separation)}px", (w // 2 - 45, h - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.40, sep_color, 1, cv2.LINE_AA)
+            cv2.putText(frame, f"Gap {int(hand_separation)}px", (w // 2 - 38, h - 18),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.36, sep_color, 1, cv2.LINE_AA)
 
         if time.time() < self.flash_until:
-            cv2.putText(frame, self.flash_label, (w - 200, h - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, self.flash_color, 2, cv2.LINE_AA)
+            cv2.putText(frame, self.flash_label, (w - 170, h - 18),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.40, self.flash_color, 1, cv2.LINE_AA)
 
-        return frame
-
-    def draw_gesture_hud(self, frame):
-        h, w = frame.shape[:2]
-        panel_w = 210
-        x1, y1, x2, y2 = w - panel_w - 12, 62, w - 12, 290
-        frame = self.draw_panel(frame, x1, y1, x2, y2, alpha=0.72, border_color=COLORS['accent'])
-
-        cv2.putText(frame, "GESTURES", (x1 + 12, y1 + 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, COLORS['accent_light'], 1, cv2.LINE_AA)
-
-        items = [
-            ("R: Index up", "Move", COLORS['box_right']),
-            ("R: V sign", "Drag", COLORS['box_drag']),
-            ("L: Index down", "Left click", COLORS['box_click']),
-            ("L: Middle down", "Right click", COLORS['warning']),
-            ("L: Fist", "Middle click", COLORS['text_muted']),
-            ("L: Index+Mid down", "Double click", COLORS['accent_light']),
-            ("L: Ring down", "Scroll", COLORS['box_scroll']),
-        ]
-        y = y1 + 44
-        for label, action, color in items:
-            cv2.circle(frame, (x1 + 18, y - 5), 4, color, -1, cv2.LINE_AA)
-            cv2.putText(frame, label, (x1 + 28, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.34, COLORS['text_primary'], 1, cv2.LINE_AA)
-            cv2.putText(frame, action, (x1 + 28, y + 14),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, color, 1, cv2.LINE_AA)
-            y += 30
         return frame
 
     def draw_debug_panel(self, frame, debug_info):
@@ -296,8 +268,6 @@ class OverlayRenderer:
             state.get('hand_separation'),
             state.get('hands_too_close', False),
         )
-
-        frame = self.draw_gesture_hud(frame)
 
         if state.get('show_debug') and state.get('debug_info'):
             frame = self.draw_debug_panel(frame, state['debug_info'])

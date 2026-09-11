@@ -16,6 +16,7 @@ from config.settings import CAMERA_SETTINGS, DISPLAY_SETTINGS, COLORS, MOUSE_SET
 from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
+from ui.overlay import OverlayRenderer
 from utils.helpers import log_message, get_fps
 
 
@@ -82,6 +83,7 @@ class AirClick:
             MOUSE_SETTINGS.get('gesture_stability_frames', 3),
         )
         self.mouse_controller = MouseController()
+        self.overlay_renderer = OverlayRenderer()
 
         self.frame_width = CAMERA_SETTINGS['frame_width']
         self.frame_height = CAMERA_SETTINGS['frame_height']
@@ -248,16 +250,11 @@ class AirClick:
 
         box = self.hand_tracker.get_bounding_box(self.right_hand_index)
         if box:
-            color = (0, 180, 255) if self.drag_active else COLORS['box_right']
-            self._draw_hand_region(frame, box, color, "MOUSE", live, self.current_gesture_right)
             if self.show_landmarks and live:
                 self.hand_tracker.draw_landmarks(
                     frame, COLORS['cursor_point'], self.right_hand_index,
                     show_mesh=DISPLAY_SETTINGS.get('show_hand_mesh', True),
                 )
-
-        if self.cursor_tip:
-            self._draw_crosshair(frame, self.cursor_tip, COLORS['cursor_point'])
 
     def _process_click_hand(self, frame):
         if self.hands_too_close:
@@ -270,12 +267,15 @@ class AirClick:
             return
 
         raw_gesture = self.gesture_recognizer.recognize_click_hand(fingers)
-        gesture = self.click_gesture_stabilizer.update(raw_gesture) or raw_gesture
-        self.current_gesture_left = gesture
+        stable_gesture = self.click_gesture_stabilizer.update(raw_gesture)
+        gesture = stable_gesture
+        self.current_gesture_left = (
+            stable_gesture or self.gesture_recognizer.gesture_names['unknown']
+        )
         now = time.time()
         cooldown_ok = now - self.last_click_time > self.click_cooldown
 
-        if live:
+        if live and gesture is not None:
             if self.gesture_recognizer.is_scroll(gesture):
                 h, _, _ = frame.shape
                 center_y = self.hand_tracker.get_hand_center_y(self.left_hand_index, h)
@@ -301,7 +301,6 @@ class AirClick:
             self.middle_click_active = self.gesture_recognizer.is_middle_click(gesture)
             self.double_click_active = self.gesture_recognizer.is_double_click(gesture)
         else:
-            self.click_gesture_stabilizer.reset()
             self.left_click_active = False
             self.right_click_active = False
             self.middle_click_active = False
@@ -326,7 +325,6 @@ class AirClick:
             else:
                 color, label = COLORS['box_left'], self.current_gesture_left
 
-            self._draw_hand_region(frame, box, color, "CLICK", live, label)
             if self.show_landmarks and live:
                 self.hand_tracker.draw_landmarks(
                     frame, color, self.left_hand_index,
@@ -400,64 +398,47 @@ class AirClick:
         cv2.circle(frame, (x, y), 2, (255, 255, 255), -1, cv2.LINE_AA)
 
     def draw_overlay(self, frame):
-        h, w = frame.shape[:2]
-        frame = self._draw_hand_zones(frame)
+        def hand_state(index):
+            if index == -1:
+                return None, False
+            return self.hand_tracker.get_bounding_box(index), self.hand_tracker.is_hand_live(index)
 
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 42), (10, 10, 20), -1)
-        cv2.rectangle(overlay, (0, h - 48), (w, h), (10, 10, 20), -1)
-        frame = cv2.addWeighted(overlay, 0.75, frame, 0.25, 0)
+        right_box, right_live = hand_state(self.right_hand_index)
+        left_box, left_live = hand_state(self.left_hand_index)
+        left_color = COLORS['box_left']
+        if time.time() - self.last_click_time < 0.4:
+            left_color = {
+                'left': COLORS['box_click'],
+                'right': (0, 165, 255),
+                'middle': (180, 180, 180),
+                'double': (200, 100, 200),
+            }.get(self.last_click_type, left_color)
+        elif self.scroll_active:
+            left_color = COLORS['box_scroll']
 
-        cv2.putText(frame, "AIRCLICK PRO", (14, 28),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (233, 69, 96), 2, cv2.LINE_AA)
-
-        if self.show_fps:
-            fps = get_fps(self.start_time, self.frame_count)
-            cv2.putText(frame, f"{fps:.0f} FPS", (w - 90, 28),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
-
-        cv2.putText(frame, "q:Exit  h:Help  d:Debug", (w - 160, 28),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 140), 1, cv2.LINE_AA)
-
-        mode_colors = {
-            "MOVING": (81, 207, 102),
-            "DRAGGING": (60, 180, 255),
-            "READY": (79, 195, 247),
-            "ANCHOR": (255, 200, 100),
-            "SCROLLING": (200, 100, 255),
-            "LOCKED": (100, 100, 120),
+        state = {
+            'right_box': right_box,
+            'right_color': (0, 180, 255) if self.drag_active else COLORS['box_right'],
+            'right_gesture': self.current_gesture_right,
+            'right_live': right_live,
+            'left_box': left_box,
+            'left_color': left_color,
+            'left_gesture': self.current_gesture_left,
+            'left_live': left_live,
+            'cursor_tip': self.cursor_tip,
+            'right_landmarks': None,
+            'left_landmarks': None,
+            'show_landmarks': False,
+            'show_fps': self.show_fps,
+            'fps': get_fps(self.start_time, self.frame_count),
+            'mode': self.mouse_mode,
+            'hand_separation': self.hand_tracker.hand_separation,
+            'hands_too_close': self.hands_too_close,
+            'show_debug': self.show_debug,
+            'debug_info': self.debug_info,
+            'hand_was_detected': self.hand_was_detected,
         }
-        cv2.putText(frame, f"Mode: {self.mouse_mode}", (14, h - 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, mode_colors.get(self.mouse_mode, (150, 150, 150)), 1, cv2.LINE_AA)
-
-        cv2.putText(frame, f"R: {self.current_gesture_right}", (180, h - 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_right'], 1, cv2.LINE_AA)
-        cv2.putText(frame, f"L: {self.current_gesture_left}", (360, h - 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLORS['box_left'], 1, cv2.LINE_AA)
-
-        if self.last_click_type and time.time() - self.last_click_time < 0.5:
-            labels = {'left': 'LEFT CLICK', 'right': 'RIGHT CLICK',
-                      'middle': 'MIDDLE CLICK', 'double': 'DOUBLE CLICK'}
-            colors = {'left': COLORS['box_click'], 'right': (0, 165, 255),
-                      'middle': (180, 180, 180), 'double': (200, 100, 255)}
-            cv2.putText(frame, labels.get(self.last_click_type, ''), (w - 160, h - 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, colors.get(self.last_click_type, (255, 255, 255)), 1, cv2.LINE_AA)
-
-        if self.mouse_mode == "LOCKED" and self.hand_was_detected:
-            cv2.putText(frame, "NO HANDS", (w // 2 - 70, h // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (80, 80, 200), 2, cv2.LINE_AA)
-
-        if self.hands_too_close:
-            cv2.putText(frame, "Hands too close - spread apart!", (w // 2 - 160, 62),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 80, 255), 2, cv2.LINE_AA)
-
-        if self.show_debug:
-            y = 58
-            for line in self.debug_info:
-                cv2.putText(frame, line, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 255, 255), 1, cv2.LINE_AA)
-                y += 18
-
-        return frame
+        return self.overlay_renderer.render(frame, state)
 
     def _draw_hand_zones(self, frame):
         h, w = frame.shape[:2]

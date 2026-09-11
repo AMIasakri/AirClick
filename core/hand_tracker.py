@@ -80,6 +80,11 @@ class HandTracker:
             'mouse': {'center': None, 'lost': 0},
             'click': {'center': None, 'lost': 0},
         }
+        self.role_candidate = None
+        self.role_candidate_frames = 0
+        # MediaPipe may reorder detections during fast movement. Keep the
+        # physical handedness associated with each application role.
+        self.role_hand_types = {'mouse': None, 'click': None}
         
         log_message("HandTracker ready")
     
@@ -267,8 +272,35 @@ class HandTracker:
         c1 = (d1['center_x'], d1['center_y'])
         mouse_mem = self.role_memory['mouse']['center']
         click_mem = self.role_memory['click']['center']
+        known_types = {d.get('hand_type') for d in (d0, d1)}
+        mapped_types = {
+            self.role_hand_types['mouse'],
+            self.role_hand_types['click'],
+        }
 
-        if mouse_mem and click_mem:
+        if (
+            len(known_types) == 2
+            and None not in mapped_types
+            and known_types == mapped_types
+        ):
+            by_type = {d0.get('hand_type'): d0, d1.get('hand_type'): d1}
+            mouse_detection = by_type.get(self.role_hand_types['mouse'])
+            click_detection = by_type.get(self.role_hand_types['click'])
+            if mouse_detection and click_detection:
+                mouse_idx = mouse_detection['index']
+                click_idx = click_detection['index']
+                mouse_center = (
+                    mouse_detection['center_x'],
+                    mouse_detection['center_y'],
+                )
+                click_center = (
+                    click_detection['center_x'],
+                    click_detection['center_y'],
+                )
+            else:
+                mouse_idx, click_idx = d0['index'], d1['index']
+                mouse_center, click_center = c0, c1
+        elif mouse_mem and click_mem:
             assign_a = self._dist(c0, mouse_mem) + self._dist(c1, click_mem)
             assign_b = self._dist(c0, click_mem) + self._dist(c1, mouse_mem)
             if assign_a <= assign_b:
@@ -290,13 +322,15 @@ class HandTracker:
         return mouse_idx, click_idx
 
     def _assign_hand_roles(self, frame_width, frame_height):
-        self.mouse_hand_index = -1
-        self.click_hand_index = -1
         self.hand_separation = None
         self.hands_too_close = False
 
         live_indices = [i for i, live in enumerate(self.hand_is_live) if live]
         if not live_indices:
+            self.mouse_hand_index = -1
+            self.click_hand_index = -1
+            self.role_candidate = None
+            self.role_candidate_frames = 0
             self.role_memory['mouse']['lost'] += 1
             self.role_memory['click']['lost'] += 1
             return
@@ -304,22 +338,31 @@ class HandTracker:
         detections = []
         for i in live_indices:
             cx, cy = self._hand_center(i)
-            detections.append({'index': i, 'center_x': cx, 'center_y': cy})
+            detections.append({
+                'index': i,
+                'center_x': cx,
+                'center_y': cy,
+                'hand_type': self.get_hand_type(i),
+            })
 
         if len(detections) == 1:
             d = detections[0]
-            role = self._resolve_single_hand_role(d, frame_width)
+            hand_type = d.get('hand_type')
+            if hand_type == self.role_hand_types.get('mouse'):
+                role = 'mouse'
+            elif hand_type == self.role_hand_types.get('click'):
+                role = 'click'
+            else:
+                role = self._resolve_single_hand_role(d, frame_width)
             if role == 'mouse':
-                self.mouse_hand_index = d['index']
+                proposed = (d['index'], -1)
                 self._update_role_memory('mouse', (d['center_x'], d['center_y']))
                 self.role_memory['click']['lost'] += 1
             else:
-                self.click_hand_index = d['index']
+                proposed = (-1, d['index'])
                 self._update_role_memory('click', (d['center_x'], d['center_y']))
                 self.role_memory['mouse']['lost'] += 1
-            return
-
-        if len(detections) >= 2:
+        else:
             detections.sort(key=lambda d: d['center_x'])
             d0, d1 = detections[0], detections[-1]
             self.hand_separation = self._dist(
@@ -327,7 +370,73 @@ class HandTracker:
                 (d1['center_x'], d1['center_y']),
             )
             self.hands_too_close = self.hand_separation < HAND_SETTINGS['min_hand_separation']
-            self.mouse_hand_index, self.click_hand_index = self._match_hands_to_roles(d0, d1)
+            proposed = self._match_hands_to_roles(d0, d1)
+
+        current = (self.mouse_hand_index, self.click_hand_index)
+        if current == proposed:
+            self.role_candidate = None
+            self.role_candidate_frames = 0
+            return
+
+        detections_by_index = {d['index']: d for d in detections}
+        mouse_detection = detections_by_index.get(proposed[0])
+        click_detection = detections_by_index.get(proposed[1])
+        identity_preserved = (
+            (
+                mouse_detection is None
+                or mouse_detection.get('hand_type') == self.role_hand_types.get('mouse')
+            )
+            and (
+                click_detection is None
+                or click_detection.get('hand_type') == self.role_hand_types.get('click')
+            )
+            and (
+                mouse_detection is not None
+                or self.role_hand_types.get('mouse') is None
+            )
+            and (
+                click_detection is not None
+                or self.role_hand_types.get('click') is None
+            )
+        )
+        if identity_preserved and None not in (
+            self.role_hand_types.get('mouse'),
+            self.role_hand_types.get('click'),
+        ):
+            self.mouse_hand_index, self.click_hand_index = proposed
+            self._remember_role_hand_types(detections, proposed)
+            self.role_candidate = None
+            self.role_candidate_frames = 0
+            return
+
+        if current[0] not in live_indices and current[1] not in live_indices:
+            self.mouse_hand_index, self.click_hand_index = proposed
+            self._remember_role_hand_types(detections, proposed)
+            self.role_candidate = None
+            self.role_candidate_frames = 0
+            return
+
+        if self.role_candidate == proposed:
+            self.role_candidate_frames += 1
+        else:
+            self.role_candidate = proposed
+            self.role_candidate_frames = 1
+
+        required = max(1, int(HAND_SETTINGS.get('role_stability_frames', 3)))
+        if self.role_candidate_frames >= required:
+            self.mouse_hand_index, self.click_hand_index = proposed
+            self._remember_role_hand_types(detections, proposed)
+            self.role_candidate = None
+            self.role_candidate_frames = 0
+
+    def _remember_role_hand_types(self, detections, proposed):
+        by_index = {d['index']: d for d in detections}
+        mouse_detection = by_index.get(proposed[0])
+        click_detection = by_index.get(proposed[1])
+        if mouse_detection and mouse_detection.get('hand_type') in ('Left', 'Right'):
+            self.role_hand_types['mouse'] = mouse_detection['hand_type']
+        if click_detection and click_detection.get('hand_type') in ('Left', 'Right'):
+            self.role_hand_types['click'] = click_detection['hand_type']
 
     def get_mouse_hand_index(self):
         return self.mouse_hand_index

@@ -16,7 +16,12 @@ python main.py
 ```bash
 python test_setup.py
 python tests/test_gestures.py
+python tests/test_hand_tracker.py
+python tests/test_mouse_controller.py
+python tests/test_settings.py
 ```
+
+`test_setup.py` تنظیمات، وابستگی‌ها، دوربین و مدل MediaPipe را بررسی می‌کند.
 
 ## ژست‌ها
 
@@ -35,6 +40,19 @@ python tests/test_gestures.py
 - `q` — خروج
 - `h` — راهنما
 - `d` — دیباگ
+
+## تنظیم حساسیت
+
+مقادیر قابل تنظیم در `config/settings.py` قرار دارند:
+
+- `MOUSE_SETTINGS.movement_speed` — سرعت حرکت موس
+- `MOUSE_SETTINGS.smoothing_factor` — نرمی حرکت، بین `0` و `1`
+- `MOUSE_SETTINGS.dead_zone` — مقدار حرکت نادیده‌گرفته‌شده برای کاهش لرزش
+- `MOUSE_SETTINGS.gesture_stability_frames` — تعداد فریم لازم برای تأیید ژست
+- `HAND_SETTINGS.role_stability_frames` — تعداد فریم لازم برای تغییر نقش دست
+- `HAND_SETTINGS.min_hand_separation` — حداقل فاصله دو دست
+
+مقادیر نامعتبر هنگام شروع برنامه با خطای واضح رد می‌شوند.
 
 ## ساختار
 

@@ -65,6 +65,9 @@ class MouseController:
         return self._move_absolute(tip_x, tip_y, frame_width, frame_height)
 
     def _move_relative(self, tip_x, tip_y, frame_width, frame_height, reanchor=False, menu_mode=False):
+        if frame_width <= 0 or frame_height <= 0:
+            raise ValueError("Frame dimensions must be positive")
+
         if reanchor or not self.tracking_active:
             self.last_tip_x = tip_x
             self.last_tip_y = tip_y
@@ -99,6 +102,9 @@ class MouseController:
         return self.current_x, self.current_y
 
     def _move_absolute(self, tip_x, tip_y, frame_width, frame_height):
+        if frame_width <= 0 or frame_height <= 0:
+            raise ValueError("Frame dimensions must be positive")
+
         target_x = int(tip_x * self.screen_width / frame_width)
         target_y = int(tip_y * self.screen_height / frame_height)
 

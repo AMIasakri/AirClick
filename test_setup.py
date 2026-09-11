@@ -12,6 +12,7 @@ import cv2
 import mediapipe as mp
 import pyautogui
 
+from config.settings import CAMERA_SETTINGS, validate_settings
 from utils.helpers import log_message
 
 
@@ -24,16 +25,26 @@ def main():
     log_message(f"OpenCV version: {cv2.__version__}")
     log_message(f"MediaPipe version: {mp.__version__}")
 
+    try:
+        validate_settings()
+    except ValueError as error:
+        log_message(f"Invalid settings: {error}", "ERROR")
+        sys.exit(1)
+    log_message("Settings OK")
+
     screen_width, screen_height = pyautogui.size()
     log_message(f"PyAutoGUI OK — screen: {screen_width}x{screen_height}")
 
     log_message("Testing camera...")
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        log_message("Camera not found!", "ERROR")
-        sys.exit(1)
-    log_message("Camera OK")
-    cap.release()
+    camera_id = CAMERA_SETTINGS['camera_id']
+    cap = cv2.VideoCapture(camera_id)
+    try:
+        if not cap.isOpened():
+            log_message(f"Camera {camera_id} not found!", "ERROR")
+            sys.exit(1)
+        log_message(f"Camera {camera_id} OK")
+    finally:
+        cap.release()
 
     folders = ['core', 'utils', 'config', 'ui', 'tests']
     log_message("Checking project structure:")
@@ -42,14 +53,20 @@ def main():
         status = "OK" if folder not in missing else "MISSING"
         log_message(f"  {folder}/ — {status}")
 
-    files = ['main.py', 'requirements.txt', 'README.md']
+    files = [
+        'main.py',
+        'requirements.txt',
+        'README.md',
+        'hand_landmarker.task',
+    ]
     log_message("Checking main files:")
     for file in files:
         status = "OK" if os.path.exists(file) else "MISSING"
         log_message(f"  {file} — {status}")
 
-    if missing:
-        log_message("Some folders are missing.", "ERROR")
+    missing_files = [file for file in files if not os.path.exists(file)]
+    if missing or missing_files:
+        log_message("Project structure is incomplete.", "ERROR")
         sys.exit(1)
 
     log_message("=" * 50)

@@ -71,6 +71,10 @@ def test_role_assignment_separates_two_hands():
     tracker.click_hand_index = -1
     tracker.hand_separation = None
     tracker.hands_too_close = False
+    tracker.role_hand_types = {"mouse": None, "click": None}
+    tracker.role_candidate = None
+    tracker.role_candidate_frames = 0
+    tracker.hand_types = ["Right", "Left"]
 
     tracker._assign_hand_roles(640, 480)
 
@@ -80,9 +84,71 @@ def test_role_assignment_separates_two_hands():
     assert tracker.hands_too_close is False
 
 
+def test_role_change_requires_multiple_frames():
+    tracker = HandTracker.__new__(HandTracker)
+    tracker.hand_is_live = [True]
+    tracker.all_bounding_boxes = [((80, 100), (180, 220))]
+    tracker.role_memory = {
+        "mouse": {"center": None, "lost": 0},
+        "click": {"center": None, "lost": 0},
+    }
+    tracker.mouse_hand_index = 0
+    tracker.click_hand_index = 1
+    tracker.hand_separation = None
+    tracker.hands_too_close = False
+    tracker.role_candidate = None
+    tracker.role_candidate_frames = 0
+    tracker.role_hand_types = {"mouse": None, "click": None}
+    tracker.hand_types = ["Right"]
+
+    tracker._resolve_single_hand_role = lambda detection, width: "click"
+    for _ in range(2):
+        tracker._assign_hand_roles(640, 480)
+        assert (tracker.mouse_hand_index, tracker.click_hand_index) == (0, 1)
+
+    tracker._assign_hand_roles(640, 480)
+    assert (tracker.mouse_hand_index, tracker.click_hand_index) == (-1, 0)
+
+
+def test_fast_reordering_keeps_roles_by_handedness():
+    tracker = HandTracker.__new__(HandTracker)
+    tracker.hand_is_live = [True, True]
+    tracker.all_bounding_boxes = [
+        ((80, 100), (180, 220)),
+        ((420, 100), (520, 220)),
+    ]
+    tracker.hand_types = ["Right", "Left"]
+    tracker.role_memory = {
+        "mouse": {"center": None, "lost": 0},
+        "click": {"center": None, "lost": 0},
+    }
+    tracker.mouse_hand_index = -1
+    tracker.click_hand_index = -1
+    tracker.hand_separation = None
+    tracker.hands_too_close = False
+    tracker.role_candidate = None
+    tracker.role_candidate_frames = 0
+    tracker.role_hand_types = {"mouse": None, "click": None}
+
+    tracker._assign_hand_roles(640, 480)
+    assert (tracker.mouse_hand_index, tracker.click_hand_index) == (0, 1)
+
+    tracker.hand_is_live = [True, True]
+    tracker.all_bounding_boxes = [
+        ((430, 100), (530, 220)),
+        ((70, 100), (170, 220)),
+    ]
+    tracker.hand_types = ["Left", "Right"]
+    tracker._assign_hand_roles(640, 480)
+
+    assert (tracker.mouse_hand_index, tracker.click_hand_index) == (1, 0)
+
+
 if __name__ == "__main__":
     test_invalid_indices_do_not_read_from_end_of_lists()
     test_pointer_gesture_accepts_slightly_bent_index()
     test_drag_gesture_requires_index_and_middle()
     test_role_assignment_separates_two_hands()
+    test_role_change_requires_multiple_frames()
+    test_fast_reordering_keeps_roles_by_handedness()
     print("All HandTracker tests passed.")

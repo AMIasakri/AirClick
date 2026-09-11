@@ -12,7 +12,13 @@ import threading
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config.settings import CAMERA_SETTINGS, DISPLAY_SETTINGS, COLORS, MOUSE_SETTINGS
+from config.settings import (
+    CAMERA_SETTINGS,
+    DISPLAY_SETTINGS,
+    COLORS,
+    MOUSE_SETTINGS,
+    validate_settings,
+)
 from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
@@ -73,6 +79,7 @@ class HelpWindow:
 
 class AirClick:
     def __init__(self):
+        validate_settings()
         log_message("=" * 50)
         log_message("AirClick Pro Starting...")
         log_message("=" * 50)
@@ -369,33 +376,6 @@ class AirClick:
             f = self.hand_tracker.get_click_fingers_status(self.left_hand_index)
             if f:
                 self.debug_info.append(f"Fingers: idx={f[1]} mid={f[2]} rng={f[3]} pnk={f[4]}")
-
-    def _draw_hand_region(self, frame, box, color, hand_label, live, status):
-        (x1, y1), (x2, y2) = box
-        thickness = 2 if live else 1
-        lt = cv2.LINE_AA
-
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            cv2.rectangle(frame, (x1 + dx, y1 + dy), (x2 + dx, y2 + dy), (0, 0, 0), thickness + 1, lt)
-
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness, lt)
-
-        corner = 18
-        for cx, cy, sx, sy in [(x1, y1, 1, 1), (x2, y1, -1, 1), (x1, y2, 1, -1), (x2, y2, -1, -1)]:
-            cv2.line(frame, (cx, cy), (cx + sx * corner, cy), color, 3, lt)
-            cv2.line(frame, (cx, cy), (cx, cy + sy * corner), color, 3, lt)
-
-        tag = hand_label if live else f"{hand_label} (mem)"
-        cv2.putText(frame, tag, (x1, max(y1 - 8, 14)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, lt)
-        cv2.putText(frame, status, (x1, y2 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1, lt)
-
-    def _draw_crosshair(self, frame, tip, color):
-        x, y = tip
-        size = 14
-        cv2.line(frame, (x - size, y), (x + size, y), color, 1, cv2.LINE_AA)
-        cv2.line(frame, (x, y - size), (x, y + size), color, 1, cv2.LINE_AA)
-        cv2.circle(frame, (x, y), 6, color, 2, cv2.LINE_AA)
-        cv2.circle(frame, (x, y), 2, (255, 255, 255), -1, cv2.LINE_AA)
 
     def draw_overlay(self, frame):
         def hand_state(index):

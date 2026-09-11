@@ -25,6 +25,7 @@ HAND_SETTINGS = {
     'movement_index_bend': 0.065,
     'use_spatial_roles': True,
     'enhance_frame': False,
+    'role_stability_frames': 3,
 }
 
 # ==================== تنظیمات عملکرد ====================
@@ -98,3 +99,35 @@ GESTURE_SETTINGS = {
         'waiting': 'WAITING',
     }
 }
+
+
+def validate_settings():
+    """Validate values that directly affect tracking and mouse safety."""
+    positive = (
+        ('CAMERA_SETTINGS.frame_width', CAMERA_SETTINGS['frame_width']),
+        ('CAMERA_SETTINGS.frame_height', CAMERA_SETTINGS['frame_height']),
+        ('HAND_SETTINGS.min_hand_separation', HAND_SETTINGS['min_hand_separation']),
+        ('MOUSE_SETTINGS.movement_speed', MOUSE_SETTINGS['movement_speed']),
+        ('MOUSE_SETTINGS.scroll_dead_zone', MOUSE_SETTINGS['scroll_dead_zone']),
+    )
+    for name, value in positive:
+        if value <= 0:
+            raise ValueError(f'{name} must be greater than zero')
+
+    bounded = (
+        ('MOUSE_SETTINGS.smoothing_factor', MOUSE_SETTINGS['smoothing_factor'], 0, 1),
+        ('MEDIAPIPE_SETTINGS.min_detection_confidence',
+         MEDIAPIPE_SETTINGS['min_detection_confidence'], 0, 1),
+        ('MEDIAPIPE_SETTINGS.min_tracking_confidence',
+         MEDIAPIPE_SETTINGS['min_tracking_confidence'], 0, 1),
+    )
+    for name, value, minimum, maximum in bounded:
+        if not minimum <= value <= maximum:
+            raise ValueError(f'{name} must be between {minimum} and {maximum}')
+
+    for name, value in (
+        ('HAND_SETTINGS.role_stability_frames', HAND_SETTINGS['role_stability_frames']),
+        ('MOUSE_SETTINGS.gesture_stability_frames', MOUSE_SETTINGS['gesture_stability_frames']),
+    ):
+        if int(value) != value or value < 1:
+            raise ValueError(f'{name} must be a positive integer')

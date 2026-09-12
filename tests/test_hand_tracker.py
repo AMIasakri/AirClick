@@ -144,6 +144,20 @@ def test_fast_reordering_keeps_roles_by_handedness():
     assert (tracker.mouse_hand_index, tracker.click_hand_index) == (1, 0)
 
 
+def test_video_timestamp_is_monotonic():
+    tracker = HandTracker.__new__(HandTracker)
+    tracker.last_timestamp_ms = 100
+    timestamps = [1000, 1000, 999]
+
+    def next_timestamp(value):
+        timestamp = max(value, tracker.last_timestamp_ms + 1)
+        tracker.last_timestamp_ms = timestamp
+        return timestamp
+
+    resolved = [next_timestamp(value) for value in timestamps]
+    assert resolved == [1000, 1001, 1002]
+
+
 if __name__ == "__main__":
     test_invalid_indices_do_not_read_from_end_of_lists()
     test_pointer_gesture_accepts_slightly_bent_index()
@@ -151,4 +165,5 @@ if __name__ == "__main__":
     test_role_assignment_separates_two_hands()
     test_role_change_requires_multiple_frames()
     test_fast_reordering_keeps_roles_by_handedness()
+    test_video_timestamp_is_monotonic()
     print("All HandTracker tests passed.")

@@ -9,6 +9,7 @@ from mediapipe.tasks.python import vision
 import sys
 import os
 import numpy as np
+import time
 from collections import deque
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,9 +41,11 @@ class HandTracker:
             num_hands=self.max_num_hands,
             min_hand_detection_confidence=self.min_detection_confidence,
             min_hand_presence_confidence=self.min_tracking_confidence,
-            min_tracking_confidence=self.min_tracking_confidence
+            min_tracking_confidence=self.min_tracking_confidence,
+            running_mode=vision.RunningMode.VIDEO,
         )
         self.detector = vision.HandLandmarker.create_from_options(options)
+        self.last_timestamp_ms = 0
         
         # لیست‌های اصلی
         self.hands_detected = []
@@ -146,7 +149,11 @@ class HandTracker:
             detect_frame = frame
         rgb = cv2.cvtColor(detect_frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        detection_result = self.detector.detect(mp_image)
+        timestamp_ms = int(time.monotonic() * 1000)
+        if timestamp_ms <= self.last_timestamp_ms:
+            timestamp_ms = self.last_timestamp_ms + 1
+        self.last_timestamp_ms = timestamp_ms
+        detection_result = self.detector.detect_for_video(mp_image, timestamp_ms)
         
         # پاک کردن لیست‌های موقت
         self.hands_detected = []

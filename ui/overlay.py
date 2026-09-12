@@ -19,6 +19,7 @@ class OverlayRenderer:
         self.flash_until = 0.0
         self.flash_label = ""
         self.flash_color = COLORS['box_click']
+        self._vignette_cache = {}
 
     def tick(self):
         self.pulse_phase = (self.pulse_phase + 0.12) % (2 * math.pi)
@@ -33,13 +34,17 @@ class OverlayRenderer:
 
     def draw_vignette(self, frame, strength=0.35):
         h, w = frame.shape[:2]
-        y, x = np.ogrid[:h, :w]
-        cx, cy = w / 2, h / 2
-        mask = np.sqrt(((x - cx) / cx) ** 2 + ((y - cy) / cy) ** 2)
-        mask = np.clip(mask ** 1.6, 0, 1)
-        mask = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 30)
-        dark = (frame.astype(np.float32) * (1 - mask[:, :, None] * strength)).astype(np.uint8)
-        return dark
+        cache_key = (w, h, strength)
+        multiplier = self._vignette_cache.get(cache_key)
+        if multiplier is None:
+            y, x = np.ogrid[:h, :w]
+            cx, cy = w / 2, h / 2
+            mask = np.sqrt(((x - cx) / cx) ** 2 + ((y - cy) / cy) ** 2)
+            mask = np.clip(mask ** 1.6, 0, 1)
+            mask = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 30)
+            multiplier = (1 - mask[:, :, None] * strength).astype(np.float32)
+            self._vignette_cache[cache_key] = multiplier
+        return (frame.astype(np.float32) * multiplier).astype(np.uint8)
 
     def draw_panel(self, frame, x1, y1, x2, y2, alpha=0.82, border_color=None):
         overlay = frame.copy()

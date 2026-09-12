@@ -17,6 +17,7 @@ from config.settings import (
     DISPLAY_SETTINGS,
     COLORS,
     MOUSE_SETTINGS,
+    PERFORMANCE_SETTINGS,
     validate_settings,
 )
 from core.hand_tracker import HandTracker
@@ -131,6 +132,9 @@ class AirClick:
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+        buffer_size = PERFORMANCE_SETTINGS.get('camera_buffer_size')
+        if buffer_size is not None:
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, buffer_size)
         log_message(f"Camera: {self.frame_width}x{self.frame_height}")
 
     def run(self):

@@ -28,7 +28,7 @@ class HandTracker:
         self.min_detection_confidence = MEDIAPIPE_SETTINGS['min_detection_confidence']
         self.min_tracking_confidence = MEDIAPIPE_SETTINGS['min_tracking_confidence']
 
-        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.project_root = self._get_runtime_root()
         model_path = os.path.join(self.project_root, 'hand_landmarker.task')
         if not os.path.exists(model_path):
             log_message("Model not found — downloading...")
@@ -87,6 +87,14 @@ class HandTracker:
         self.role_hand_types = {'mouse': None, 'click': None}
         
         log_message("HandTracker ready")
+
+    @staticmethod
+    def _get_runtime_root():
+        """Resolve resources both from source and from a PyInstaller bundle."""
+        bundled_root = getattr(sys, '_MEIPASS', None)
+        if bundled_root:
+            return bundled_root
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     def _download_model(self, model_path):
         import urllib.request

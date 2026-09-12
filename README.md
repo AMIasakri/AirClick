@@ -67,3 +67,19 @@ AirClick/
 ├── ui/overlay.py           # UI حرفه‌ای
 └── utils/
 ```
+
+## ساخت Setup ویندوز
+
+برای ساخت فایل اجرایی مستقل و نصب‌کننده شبیه برنامه‌های ویندوز:
+
+1. [PyInstaller](https://pyinstaller.org/) و [Inno Setup](https://jrsoftware.org/isinfo.php) را نصب کن.
+2. PowerShell را در ریشه پروژه باز کن.
+3. این دستور را اجرا کن:
+
+```powershell
+python -m pip install pyinstaller
+.\packaging\build_installer.ps1
+```
+
+فایل نصب در `dist/installer/AirClick-Setup-1.0.0.exe` ساخته می‌شود.
+برای ساخت فقط نسخه اجرایی بدون نصب‌کننده، از `-SkipInstaller` استفاده کن.

@@ -22,6 +22,9 @@ UninstallDisplayName={#AppName}
 [Files]
 Source: "..\dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
+[Dirs]
+Name: "{app}\logs"; Permissions: users-modify
+
 [Icons]
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"

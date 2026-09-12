@@ -24,7 +24,7 @@ from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
 from ui.overlay import OverlayRenderer
-from utils.helpers import log_message, get_fps
+from utils.helpers import configure_logging, log_message, get_fps
 
 
 class HelpWindow:
@@ -439,11 +439,13 @@ class AirClick:
 
 if __name__ == "__main__":
     try:
+        configure_logging()
         app = AirClick()
         app.run()
     except KeyboardInterrupt:
         log_message("Interrupted")
     except Exception as e:
         log_message(f"Error: {e}", "ERROR")
+        log_message("See %LOCALAPPDATA%\\AirClick\\logs\\airclick.log for details.", "ERROR")
     finally:
         cv2.destroyAllWindows()

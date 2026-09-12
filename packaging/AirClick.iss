@@ -30,5 +30,9 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\logs"
+Type: files; Name: "{localappdata}\AirClick\preferences.json"
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent

@@ -40,6 +40,10 @@ def test_invalid_stability_count_is_rejected():
         settings.HAND_SETTINGS['role_stability_frames'] = original
 
 
+def test_role_switch_distance_multiplier_is_positive():
+    assert settings.HAND_SETTINGS['role_switch_distance_multiplier'] > 1
+
+
 if __name__ == '__main__':
     test_default_settings_are_valid()
     test_invalid_smoothing_is_rejected()

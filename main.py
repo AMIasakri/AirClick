@@ -103,6 +103,10 @@ class AirClick:
         self.running = False
         self.frame_count = 0
         self.start_time = time.time()
+        self._frame_lock = threading.Lock()
+        self._latest_display = None
+        self._worker_error = None
+        self._capture_thread = None
 
         self.left_hand_index = -1
         self.right_hand_index = -1
@@ -145,20 +149,23 @@ class AirClick:
         cv2.namedWindow("AirClick", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("AirClick", win_w, win_h)
         cv2.setWindowProperty("AirClick", cv2.WND_PROP_TOPMOST, 1)
+        self._capture_thread = threading.Thread(
+            target=self._capture_loop,
+            name="AirClickCapture",
+            daemon=True,
+        )
+        self._capture_thread.start()
 
         try:
             while self.running:
-                ret, frame = self.cap.read()
-                if not ret:
-                    log_message("Could not read a frame from the camera.", "ERROR")
+                with self._frame_lock:
+                    display = self._latest_display
+                    worker_error = self._worker_error
+                if display is not None:
+                    cv2.imshow("AirClick", display)
+                if worker_error:
+                    log_message(worker_error, "ERROR")
                     break
-
-                frame = cv2.flip(frame, 1)
-                self.process_frame(frame)
-                display = self.draw_overlay(frame)
-
-                cv2.imshow("AirClick", display)
-                self.frame_count += 1
 
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord('q'), 27):
@@ -169,6 +176,27 @@ class AirClick:
                     self.show_debug = not self.show_debug
         finally:
             self.cleanup()
+
+    def _capture_loop(self):
+        try:
+            while self.running:
+                ret, frame = self.cap.read()
+                if not ret:
+                    with self._frame_lock:
+                        self._worker_error = "Could not read a frame from the camera."
+                    break
+
+                frame = cv2.flip(frame, 1)
+                self.process_frame(frame)
+                display = self.draw_overlay(frame)
+                with self._frame_lock:
+                    self._latest_display = display
+                    self.frame_count += 1
+        except Exception as error:
+            with self._frame_lock:
+                self._worker_error = f"Camera processing failed: {error}"
+        finally:
+            self.running = False
 
     def process_frame(self, frame):
         self.hand_tracker.process_frame(frame)
@@ -428,6 +456,8 @@ class AirClick:
         log_message("Cleaning up...")
         self.running = False
         try:
+            if self._capture_thread and self._capture_thread.is_alive():
+                self._capture_thread.join(timeout=2)
             self.mouse_controller.reset()
             self.hand_tracker.release()
             self.cap.release()

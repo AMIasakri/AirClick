@@ -14,9 +14,17 @@ if (-not (Test-Path "hand_landmarker.task")) {
     throw "hand_landmarker.task is missing from the project root."
 }
 
+if (-not (Test-Path "packaging\AirClick.ico")) {
+    throw "packaging\AirClick.ico is missing."
+}
+
 pyinstaller --noconfirm --clean packaging\AirClick.spec
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."
+}
+
+if (-not (Test-Path "dist\AirClick.exe")) {
+    throw "PyInstaller completed without creating dist\AirClick.exe."
 }
 
 if ($SkipInstaller) {

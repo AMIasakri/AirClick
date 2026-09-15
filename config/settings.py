@@ -26,18 +26,19 @@ HAND_SETTINGS = {
     'use_spatial_roles': True,
     'enhance_frame': False,
     'role_stability_frames': 3,
+    'role_switch_distance_multiplier': 1.5,
 }
 
 # ==================== تنظیمات عملکرد ====================
 PERFORMANCE_SETTINGS = {
     'camera_buffer_size': 1,
     'skip_enhance_frame': True,
-    'detection_scale': 0.50,
+    'detection_scale': 0.40,
 }
 
 # ==================== تنظیمات ماوس ====================
 MOUSE_SETTINGS = {
-    'smoothing_factor': 0.50,
+    'smoothing_factor': 0.35,
     'action_cooldown': 0.20,
     'left_click_cooldown': 0.12,
     'right_click_cooldown': 0.35,
@@ -59,7 +60,7 @@ DISPLAY_SETTINGS = {
     'show_landmarks': True,
     'show_hand_mesh': True,
     'mesh_line_thickness': 1,
-    'mesh_glow_strength': 0.10,
+    'mesh_glow_strength': 0.0,
     'show_debug': False,
     'box_padding': 25,
     'window_width': 680,

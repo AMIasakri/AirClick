@@ -32,7 +32,7 @@ Source: "AirClick.ico"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{app}\logs"; Permissions: users-modify
 
 [Icons]
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"
+Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 

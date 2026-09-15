@@ -346,6 +346,32 @@ class HandTracker:
                 mouse_idx, click_idx = d1['index'], d0['index']
                 mouse_center, click_center = c1, c0
 
+        current = (self.mouse_hand_index, self.click_hand_index)
+        current_indices = {d['index'] for d in (d0, d1)}
+        known_types_complete = (
+            len(known_types) == 2
+            and None not in mapped_types
+            and known_types == mapped_types
+        )
+        separation = self._dist(c0, c1)
+        switch_distance = HAND_SETTINGS['min_hand_separation'] * HAND_SETTINGS.get(
+            'role_switch_distance_multiplier',
+            1.5,
+        )
+        if (
+            not known_types_complete
+            and separation < switch_distance
+            and current[0] in current_indices
+            and current[1] in current_indices
+            and (mouse_idx, click_idx) != current
+        ):
+            mouse_idx, click_idx = current
+            by_index = {d['index']: d for d in (d0, d1)}
+            mouse_detection = by_index[mouse_idx]
+            click_detection = by_index[click_idx]
+            mouse_center = (mouse_detection['center_x'], mouse_detection['center_y'])
+            click_center = (click_detection['center_x'], click_detection['center_y'])
+
         self._update_role_memory('mouse', mouse_center)
         self._update_role_memory('click', click_center)
         return mouse_idx, click_idx
@@ -644,14 +670,13 @@ class HandTracker:
         mesh_color = tuple(min(255, int(channel * 0.65 + 90)) for channel in color)
         thickness = max(1, int(DISPLAY_SETTINGS.get('mesh_line_thickness', 2)))
         visible_mesh = connections + palm_mesh if show_mesh else connections
-        glow = np.zeros_like(frame)
-        for i, j in visible_mesh:
-            cv2.line(glow, points[i], points[j], mesh_color, thickness + 3, cv2.LINE_AA)
-        glow = cv2.GaussianBlur(glow, (0, 0), 5)
-        cv2.addWeighted(
-            frame, 1.0, glow,
-            float(DISPLAY_SETTINGS.get('mesh_glow_strength', 0.28)), 0, frame,
-        )
+        glow_strength = float(DISPLAY_SETTINGS.get('mesh_glow_strength', 0.0))
+        if glow_strength > 0:
+            glow = np.zeros_like(frame)
+            for i, j in visible_mesh:
+                cv2.line(glow, points[i], points[j], mesh_color, thickness + 3, cv2.LINE_AA)
+            glow = cv2.GaussianBlur(glow, (0, 0), 5)
+            cv2.addWeighted(frame, 1.0, glow, glow_strength, 0, frame)
 
         for i, j in connections:
             cv2.line(frame, points[i], points[j], (8, 8, 16), thickness + 2, cv2.LINE_AA)

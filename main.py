@@ -68,7 +68,7 @@ class HelpWindow:
                          fg=color, bg='#12122a').pack(side='right', padx=10)
 
         for tip in ["💡 نور کافی داشته باش", "↔️  دست‌ها را از هم فاصله بده",
-                    "⌨️  q=خروج | h=راهنما | d=دیباگ"]:
+                    "⌨️  q=خروج | h=راهنما | p=توقف موس | d=دیباگ"]:
             tk.Label(root, text=tip, font=("Segoe UI", 9),
                      fg="#666688", bg='#0a0a1a').pack(pady=2)
 
@@ -88,7 +88,8 @@ class AirClick:
         self.hand_tracker = HandTracker()
         self.gesture_recognizer = GestureRecognizer()
         self.click_gesture_stabilizer = GestureStabilizer(
-            MOUSE_SETTINGS.get('gesture_stability_frames', 3),
+            MOUSE_SETTINGS.get('click_activation_frames',
+                                MOUSE_SETTINGS.get('gesture_stability_frames', 3)),
         )
         self.mouse_controller = MouseController()
         self.overlay_renderer = OverlayRenderer()
@@ -101,6 +102,7 @@ class AirClick:
         self.click_cooldown = MOUSE_SETTINGS['action_cooldown']
 
         self.running = False
+        self.controls_paused = False
         self.frame_count = 0
         self.start_time = time.time()
         self._frame_lock = threading.Lock()
@@ -174,6 +176,8 @@ class AirClick:
                     threading.Thread(target=HelpWindow.show, daemon=True).start()
                 if key == ord('d'):
                     self.show_debug = not self.show_debug
+                if key in (ord('p'), ord('P')):
+                    self.toggle_controls_pause()
         finally:
             self.cleanup()
 
@@ -206,6 +210,13 @@ class AirClick:
         self.cursor_tip = None
         self.hands_too_close = self.hand_tracker.hands_too_close
 
+        if self.controls_paused:
+            self._reset_mouse_hand()
+            self._reset_click_hand()
+            self.mouse_mode = "PAUSED"
+            self._update_debug_info()
+            return
+
         any_hand = self.left_hand_index != -1 or self.right_hand_index != -1
 
         if self.right_hand_index != -1:
@@ -224,6 +235,13 @@ class AirClick:
             self.hand_was_detected = True
 
         self._update_debug_info()
+
+    def toggle_controls_pause(self):
+        self.controls_paused = not self.controls_paused
+        log_message(
+            "Mouse controls paused." if self.controls_paused
+            else "Mouse controls resumed.",
+        )
 
     def _process_mouse_hand(self, frame):
         if self.hands_too_close:
@@ -303,6 +321,15 @@ class AirClick:
         live = self.hand_tracker.is_hand_live(self.left_hand_index)
         fingers = self.hand_tracker.get_click_fingers_status(self.left_hand_index)
         if not fingers:
+            return
+
+        if self.hand_tracker.is_pointer_gesture(self.left_hand_index):
+            self.click_gesture_stabilizer.reset()
+            self.left_click_active = False
+            self.right_click_active = False
+            self.middle_click_active = False
+            self.double_click_active = False
+            self.current_gesture_left = self.gesture_recognizer.gesture_names['unknown']
             return
 
         raw_gesture = self.gesture_recognizer.recognize_click_hand(fingers)
@@ -444,6 +471,7 @@ class AirClick:
             'show_fps': self.show_fps,
             'fps': get_fps(self.start_time, self.frame_count),
             'mode': self.mouse_mode,
+            'controls_paused': self.controls_paused,
             'hand_separation': self.hand_tracker.hand_separation,
             'hands_too_close': self.hands_too_close,
             'show_debug': self.show_debug,

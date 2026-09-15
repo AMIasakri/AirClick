@@ -270,6 +270,7 @@ class OverlayRenderer:
             "ANCHOR": COLORS['warning'],
             "SCROLLING": COLORS['box_scroll'],
             "LOCKED": COLORS['text_muted'],
+            "PAUSED": COLORS['danger'],
         }
         mode = state.get('mode', 'LOCKED')
         frame = self.draw_footer(
@@ -285,6 +286,8 @@ class OverlayRenderer:
 
         if mode == "LOCKED" and state.get('hand_was_detected'):
             self.draw_center_message(frame, "NO HANDS", COLORS['danger'])
+        if state.get('controls_paused'):
+            self.draw_center_message(frame, "PAUSED - PRESS P", COLORS['warning'])
 
         if state.get('hands_too_close'):
             self.draw_warning_banner(frame, "Hands too close - spread apart!")

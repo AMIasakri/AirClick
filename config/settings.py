@@ -52,6 +52,7 @@ MOUSE_SETTINGS = {
     'scroll_dead_zone': 8,
     'double_click_interval': 0.35,
     'gesture_stability_frames': 3,
+    'click_activation_frames': 5,
 }
 
 # ==================== تنظیمات نمایش ====================

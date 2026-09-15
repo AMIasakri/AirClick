@@ -14,7 +14,12 @@ from collections import deque
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import MEDIAPIPE_SETTINGS, HAND_SETTINGS, DISPLAY_SETTINGS
+from config.settings import (
+    MEDIAPIPE_SETTINGS,
+    HAND_SETTINGS,
+    DISPLAY_SETTINGS,
+    PERFORMANCE_SETTINGS,
+)
 from utils.helpers import log_message
 import math
 
@@ -147,6 +152,15 @@ class HandTracker:
             detect_frame = self._enhance_frame(frame)
         else:
             detect_frame = frame
+        detection_scale = PERFORMANCE_SETTINGS.get('detection_scale', 1.0)
+        if 0 < detection_scale < 1:
+            detect_frame = cv2.resize(
+                detect_frame,
+                None,
+                fx=detection_scale,
+                fy=detection_scale,
+                interpolation=cv2.INTER_AREA,
+            )
         rgb = cv2.cvtColor(detect_frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         timestamp_ms = int(time.monotonic() * 1000)

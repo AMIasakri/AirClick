@@ -8,6 +8,8 @@ AppId={{A4B4F6AF-42B2-4B11-AF9B-6C6C1C8E2D71}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
+SetupIconFile=AirClick.ico
+UninstallDisplayIcon={app}\{#AppExeName}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputDir=..\dist\installer
@@ -19,8 +21,12 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName={#AppName}
 
+[Registry]
+Root: HKLM; Subkey: "Software\{#AppName}"; ValueType: string; ValueName: "Installed"; ValueData: "1"; Flags: uninsdeletekey
+
 [Files]
 Source: "..\dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "AirClick.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\logs"; Permissions: users-modify

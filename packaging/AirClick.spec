@@ -7,6 +7,7 @@ from PyInstaller.utils.hooks import collect_all
 
 project_root = Path.cwd()
 main_script = project_root / 'main.py'
+icon_path = project_root / 'packaging' / 'AirClick.ico'
 mediapipe_datas, mediapipe_binaries, mediapipe_hiddenimports = collect_all('mediapipe')
 
 
@@ -35,6 +36,7 @@ exe = EXE(
     a.datas,
     [],
     name='AirClick',
+    icon=str(icon_path),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

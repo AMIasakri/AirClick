@@ -24,7 +24,7 @@ from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
 from ui.overlay import OverlayRenderer
-from utils.helpers import configure_logging, log_message, get_fps
+from utils.helpers import configure_logging, log_message, get_fps, require_installed_build
 
 
 class HelpWindow:
@@ -439,6 +439,7 @@ class AirClick:
 
 if __name__ == "__main__":
     try:
+        require_installed_build()
         configure_logging()
         app = AirClick()
         app.run()

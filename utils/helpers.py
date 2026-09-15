@@ -12,6 +12,7 @@ from tkinter import messagebox
 from datetime import datetime
 
 MAX_LOG_BYTES = 512 * 1024
+INSTALL_REGISTRY_KEY = r"Software\AirClick"
 _logging_enabled = False
 _log_path = None
 
@@ -109,6 +110,36 @@ def configure_logging():
             install_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _log_path = os.path.join(install_root, "logs", "airclick.log")
         _logging_enabled = True
+
+
+def require_installed_build():
+    """Prevent a packaged executable from running without the Inno Setup marker."""
+    if not getattr(sys, "_MEIPASS", None):
+        return
+
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            INSTALL_REGISTRY_KEY,
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            installed, _ = winreg.QueryValueEx(key, "Installed")
+    except (FileNotFoundError, OSError):
+        installed = None
+
+    if installed != "1":
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "AirClick",
+            "این نسخه باید ابتدا با Setup نصب شود.",
+            parent=root,
+        )
+        root.destroy()
+        raise SystemExit(1)
 
 
 def get_fps(start_time, frame_count):

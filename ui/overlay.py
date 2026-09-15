@@ -42,9 +42,15 @@ class OverlayRenderer:
             mask = np.sqrt(((x - cx) / cx) ** 2 + ((y - cy) / cy) ** 2)
             mask = np.clip(mask ** 1.6, 0, 1)
             mask = cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 30)
-            multiplier = (1 - mask[:, :, None] * strength).astype(np.float32)
+            multiplier = np.clip(
+                (1 - mask[:, :, None] * strength) * 255,
+                0,
+                255,
+            ).astype(np.uint8)
+            multiplier = np.repeat(multiplier, 3, axis=2)
             self._vignette_cache[cache_key] = multiplier
-        return (frame.astype(np.float32) * multiplier).astype(np.uint8)
+        cv2.multiply(frame, multiplier, frame, scale=1 / 255)
+        return frame
 
     def draw_panel(self, frame, x1, y1, x2, y2, alpha=0.82, border_color=None):
         overlay = frame.copy()

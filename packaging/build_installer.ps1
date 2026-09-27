@@ -54,9 +54,9 @@ $isccCommand = Get-Command iscc -ErrorAction SilentlyContinue
 $isccPath = if ($isccCommand) { $isccCommand.Source } else { $null }
 if (-not $isccPath) {
     $knownPaths = @(
-        "D:\Inno Setup 6\ISCC.exe",
         "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-        "C:\Program Files\Inno Setup 6\ISCC.exe"
+        "C:\Program Files\Inno Setup 6\ISCC.exe",
+        "D:\Inno Setup 6\ISCC.exe"
     )
     $isccPath = $knownPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
@@ -64,5 +64,21 @@ if (-not $isccPath) {
     throw "Inno Setup is not installed or ISCC.exe could not be located."
 }
 
-& $isccPath packaging\AirClick.iss
+$installerPath = Join-Path $projectRoot "dist\installer\AirClick-Setup-1.0.0.exe"
+$issPath = Join-Path $projectRoot "packaging\AirClick.iss"
+$buildStarted = Get-Date
+$isccArguments = '"{0}" /Qp "{1}"' -f $isccPath, $issPath
+& $env:ComSpec /c $isccArguments
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup failed with exit code $LASTEXITCODE."
+}
+
+if (-not (Test-Path $installerPath)) {
+    throw "Inno Setup completed without creating $installerPath."
+}
+
+if ((Get-Item $installerPath).LastWriteTime -lt $buildStarted) {
+    throw "Inno Setup did not refresh the installer output."
+}
+
 Write-Host "Installer created in dist\installer"

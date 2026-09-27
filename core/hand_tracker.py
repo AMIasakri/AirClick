@@ -38,7 +38,13 @@ class HandTracker:
         model_path = os.path.join(self.project_root, 'hand_landmarker.task')
         if not os.path.exists(model_path):
             log_message("Model not found — downloading...")
-            self._download_model(model_path)
+            try:
+                self._download_model(model_path)
+            except Exception as error:
+                raise RuntimeError(
+                    "مدل تشخیص دست دانلود نشد. اتصال اینترنت و فایل "
+                    "hand_landmarker.task را بررسی کنید."
+                ) from error
         
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.HandLandmarkerOptions(
@@ -49,7 +55,12 @@ class HandTracker:
             min_tracking_confidence=self.min_tracking_confidence,
             running_mode=vision.RunningMode.VIDEO,
         )
-        self.detector = vision.HandLandmarker.create_from_options(options)
+        try:
+            self.detector = vision.HandLandmarker.create_from_options(options)
+        except Exception as error:
+            raise RuntimeError(
+                "راه‌اندازی موتور تشخیص دست ناموفق بود. برنامه را دوباره اجرا کنید."
+            ) from error
         self.last_timestamp_ms = 0
         
         # لیست‌های اصلی

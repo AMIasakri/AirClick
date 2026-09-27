@@ -9,6 +9,7 @@ import os
 import time
 import tkinter as tk
 import threading
+import ctypes
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,7 +25,14 @@ from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
 from ui.overlay import OverlayRenderer
-from utils.helpers import configure_logging, log_message, get_fps, require_installed_build
+from utils.helpers import (
+    configure_logging,
+    log_exception,
+    log_message,
+    get_fps,
+    require_installed_build,
+    show_error,
+)
 
 
 class HelpWindow:
@@ -133,8 +141,10 @@ class AirClick:
 
         self.cap = cv2.VideoCapture(CAMERA_SETTINGS['camera_id'])
         if not self.cap.isOpened():
-            log_message("Camera not found!", "ERROR")
-            sys.exit(1)
+            self.cap.release()
+            raise RuntimeError(
+                "دوربین پیدا نشد یا توسط برنامه‌ی دیگری در حال استفاده است."
+            )
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
@@ -151,6 +161,7 @@ class AirClick:
         cv2.namedWindow("AirClick", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("AirClick", win_w, win_h)
         cv2.setWindowProperty("AirClick", cv2.WND_PROP_TOPMOST, 1)
+        self._keep_window_on_top()
         self._capture_thread = threading.Thread(
             target=self._capture_loop,
             name="AirClickCapture",
@@ -159,14 +170,26 @@ class AirClick:
         self._capture_thread.start()
 
         try:
-            while self.running:
+            while True:
                 with self._frame_lock:
                     display = self._latest_display
                     worker_error = self._worker_error
-                if display is not None:
-                    cv2.imshow("AirClick", display)
+
                 if worker_error:
                     log_message(worker_error, "ERROR")
+                    show_error(
+                        "AirClick",
+                        "دوربین به‌درستی فعال نیست یا توسط برنامه‌ای دیگر در حال استفاده است.\n"
+                        "وب‌کم را آزاد کنید و برنامه را دوباره اجرا کنید.",
+                    )
+                    self.running = False
+                    break
+
+                if display is not None:
+                    cv2.imshow("AirClick", display)
+                    self._keep_window_on_top()
+
+                if not self.running and self._capture_thread and not self._capture_thread.is_alive():
                     break
 
                 key = cv2.waitKey(1) & 0xFF
@@ -180,6 +203,27 @@ class AirClick:
                     self.toggle_controls_pause()
         finally:
             self.cleanup()
+
+    @staticmethod
+    def _keep_window_on_top():
+        """Keep the camera preview above ordinary application windows."""
+        if os.name != "nt":
+            return
+        hwnd = ctypes.windll.user32.FindWindowW(None, "AirClick")
+        if hwnd:
+            HWND_TOPMOST = -1
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SWP_SHOWWINDOW = 0x0040
+            ctypes.windll.user32.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+            )
 
     def _capture_loop(self):
         try:
@@ -199,6 +243,7 @@ class AirClick:
         except Exception as error:
             with self._frame_lock:
                 self._worker_error = f"Camera processing failed: {error}"
+            log_exception("Camera processing failed", error)
         finally:
             self.running = False
 
@@ -488,10 +533,13 @@ class AirClick:
                 self._capture_thread.join(timeout=2)
             self.mouse_controller.reset()
             self.hand_tracker.release()
-            self.cap.release()
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.release()
             cv2.destroyAllWindows()
         except Exception:
             pass
+        if self._worker_error:
+            log_message("AirClick stopped because camera processing failed.", "ERROR")
         log_message("AirClick stopped.")
 
 
@@ -504,7 +552,11 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log_message("Interrupted")
     except Exception as e:
-        log_message(f"Error: {e}", "ERROR")
-        log_message("See %LOCALAPPDATA%\\AirClick\\logs\\airclick.log for details.", "ERROR")
+        log_exception("Application startup/runtime failure", e)
+        show_error(
+            "AirClick",
+            "برنامه با خطا متوقف شد.\n"
+            "جزئیات خطا در فایل لاگ ذخیره شده است.",
+        )
     finally:
         cv2.destroyAllWindows()

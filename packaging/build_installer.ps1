@@ -18,6 +18,13 @@ if (-not (Test-Path "packaging\AirClick.ico")) {
     throw "packaging\AirClick.ico is missing."
 }
 
+Get-Process pyinstaller,python -ErrorAction SilentlyContinue | ForEach-Object {
+    $commandLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)").CommandLine
+    if ($commandLine -match "PyInstaller|pyinstaller") {
+        throw "Another PyInstaller build is still running (PID $($_.Id)). Close it and run this script again."
+    }
+}
+
 pyinstaller --noconfirm --clean packaging\AirClick.spec
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."

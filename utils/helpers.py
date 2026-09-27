@@ -10,6 +10,7 @@ import json
 import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
+import traceback
 
 MAX_LOG_BYTES = 512 * 1024
 INSTALL_REGISTRY_KEY = r"Software\AirClick"
@@ -74,6 +75,24 @@ def log_message(message, level="INFO"):
         print(f"[WARNING] Could not write log file: {_log_path}")
 
 
+def log_exception(context, error):
+    """Record a concise error and its traceback for support diagnostics."""
+    log_message(f"{context}: {error}", "ERROR")
+    traceback_text = traceback.format_exc()
+    if traceback_text and traceback_text.strip() != "NoneType: None":
+        for line in traceback_text.rstrip().splitlines():
+            log_message(line, "ERROR")
+
+
+def show_error(title, message):
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        messagebox.showerror(title, message, parent=root)
+    finally:
+        root.destroy()
+
+
 def configure_logging():
     """Ask once whether the user wants bounded logs beside the installed app."""
     global _logging_enabled, _log_path
@@ -82,26 +101,42 @@ def configure_logging():
         "AirClick",
     )
     preference_path = os.path.join(settings_root, "preferences.json")
+    consent = None
+
     try:
-        with open(preference_path, encoding="utf-8") as preference_file:
-            preference = json.load(preference_file)
-        consent = preference.get("save_logs")
+        os.makedirs(settings_root, exist_ok=True)
+        if os.path.exists(preference_path):
+            with open(preference_path, encoding="utf-8") as preference_file:
+                preference = json.load(preference_file)
+            consent = preference.get("save_logs")
     except (OSError, ValueError):
         consent = None
 
     if consent is None:
-        root = tk.Tk()
-        root.withdraw()
-        consent = messagebox.askyesno(
-            "AirClick",
-            "آیا می‌خواهید سابقه خطا و عملکرد برنامه ذخیره شود؟\n"
-            "حجم لاگ حداکثر ۵۱۲ کیلوبایت است و کنار برنامه ذخیره می‌شود.",
-            parent=root,
-        )
-        root.destroy()
-        os.makedirs(settings_root, exist_ok=True)
-        with open(preference_path, "w", encoding="utf-8") as preference_file:
-            json.dump({"save_logs": consent}, preference_file)
+        root = None
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            consent = messagebox.askyesno(
+                "AirClick",
+                "آیا می‌خواهید سابقه خطا و عملکرد برنامه ذخیره شود؟\n"
+                "حجم لاگ حداکثر ۵۱۲ کیلوبایت است و کنار برنامه ذخیره می‌شود.",
+                parent=root,
+            )
+        except Exception:
+            consent = False
+        finally:
+            if root is not None:
+                try:
+                    root.destroy()
+                except Exception:
+                    pass
+
+        try:
+            with open(preference_path, "w", encoding="utf-8") as preference_file:
+                json.dump({"save_logs": consent}, preference_file)
+        except OSError:
+            pass
 
     if consent:
         if getattr(sys, "_MEIPASS", None):

@@ -33,7 +33,7 @@ HAND_SETTINGS = {
 PERFORMANCE_SETTINGS = {
     'camera_buffer_size': 1,
     'skip_enhance_frame': True,
-    'detection_scale': 0.40,
+    'detection_scale': 0.38,
 }
 
 # ==================== تنظیمات ماوس ====================

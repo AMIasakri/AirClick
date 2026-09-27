@@ -5,9 +5,20 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
+$python = Join-Path $projectRoot ".release-venv\Scripts\python.exe"
 
-if (-not (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
-    throw "PyInstaller is not installed. Run: python -m pip install pyinstaller"
+if (-not (Test-Path $python)) {
+    throw "Release environment is missing. Create .release-venv with Python 3.14.7 and install requirements-lock.txt."
+}
+
+$pythonVersion = & $python -I -c "import platform; print(platform.python_version())"
+if ($LASTEXITCODE -ne 0 -or $pythonVersion -ne "3.14.7") {
+    throw "The release environment must use Python 3.14.7. Found: $pythonVersion"
+}
+
+& $python -I -m pip check
+if ($LASTEXITCODE -ne 0) {
+    throw "The release environment has missing or incompatible dependencies."
 }
 
 if (-not (Test-Path "hand_landmarker.task")) {
@@ -25,7 +36,7 @@ Get-Process pyinstaller,python -ErrorAction SilentlyContinue | ForEach-Object {
     }
 }
 
-pyinstaller --noconfirm --clean packaging\AirClick.spec
+& $python -I -m PyInstaller --noconfirm --clean packaging\AirClick.spec
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."
 }

@@ -8,6 +8,7 @@ build/
 .venv/
 venv/
 env/
+.release-venv/
 
 # MediaPipe model (downloaded on first run)
 hand_landmarker.task

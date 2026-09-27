@@ -11,6 +11,34 @@ python main.py
 
 > در اولین اجرا، مدل MediaPipe (`hand_landmarker.task`) به‌صورت خودکار دانلود می‌شود.
 
+برای ساخت قابل‌تکرار روی Windows x64، از Python 3.14.7 و فایل نسخه‌های قفل‌شده
+استفاده کنید:
+
+```powershell
+python -m pip install -r requirements-lock.txt
+```
+
+## حریم خصوصی و امنیت
+
+- AirClick برای تشخیص دست از دوربین دستگاه استفاده می‌کند.
+- پردازش تصویر به‌صورت محلی روی همان دستگاه انجام می‌شود.
+- تصویر دوربین، فریم‌ها و اطلاعات دست به سرور AirClick ارسال نمی‌شوند.
+- تصویر دوربین در فایل ذخیره نمی‌شود.
+- مدل `hand_landmarker.task` در نسخه‌ی Setup همراه برنامه ارائه می‌شود. در اجرای
+  نسخه‌ی سورس، اگر مدل در ریشه‌ی پروژه موجود نباشد، برنامه آن را از منبع رسمی
+  MediaPipe دانلود می‌کند.
+- ذخیره‌ی لاگ اختیاری است و برنامه در اولین اجرا برای فعال‌کردن آن اجازه می‌گیرد.
+  لاگ شامل تصویر دوربین نیست و اندازه‌ی آن به حداکثر ۵۱۲ کیلوبایت محدود می‌شود.
+- در صورت فعال‌کردن لاگ، فایل آن در پوشه‌ی `logs` کنار برنامه‌ی نصب‌شده ذخیره
+  می‌شود. تنظیم رضایت در `%LOCALAPPDATA%\AirClick\preferences.json` نگهداری
+  می‌شود.
+- برای استفاده از برنامه باید اجازه‌ی دسترسی به دوربین را در Windows فعال کنید.
+
+برای گزارش باگ یا پرسش درباره‌ی حریم خصوصی:
+
+- GitHub: https://github.com/AMIasakri/AirClick
+- Email: amir.as.7257@gmail.com
+
 ## تست
 
 ```bash
@@ -83,14 +111,24 @@ AirClick/
 
 برای ساخت فایل اجرایی مستقل و نصب‌کننده شبیه برنامه‌های ویندوز:
 
-1. [PyInstaller](https://pyinstaller.org/) و [Inno Setup](https://jrsoftware.org/isinfo.php) را نصب کن.
-2. PowerShell را در ریشه پروژه باز کن.
-3. این دستور را اجرا کن:
+1. Python `3.14.7` نسخه‌ی 64 بیتی و [Inno Setup](https://jrsoftware.org/isinfo.php) را نصب کن.
+2. PowerShell را در ریشه‌ی پروژه باز کن و محیط Build مستقل را بساز:
 
 ```powershell
-python -m pip install pyinstaller
+python --version
+python -m venv .release-venv
+$env:PYTHONPATH = ''
+$env:PIP_CONFIG_FILE = 'NUL'
+& .\.release-venv\Scripts\python.exe -m pip --isolated install -r .\requirements-lock.txt
+if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 .\packaging\build_installer.ps1
 ```
 
+اسکریپت Build فقط از `.release-venv` استفاده می‌کند و نسخه‌ی Python را بررسی
+می‌کند. برای ساخت فقط نسخه‌ی اجرایی بدون نصب‌کننده، دستور آخر را این‌طور اجرا کن:
+
+```powershell
+.\packaging\build_installer.ps1 -SkipInstaller
+```
+
 فایل نصب در `dist/installer/AirClick-Setup-1.0.0.exe` ساخته می‌شود.
-برای ساخت فقط نسخه اجرایی بدون نصب‌کننده، از `-SkipInstaller` استفاده کن.

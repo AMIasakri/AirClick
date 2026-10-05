@@ -17,6 +17,16 @@ def test_release_files_exist():
         assert os.path.exists(os.path.join(PROJECT_ROOT, relative_path))
 
 
+def test_installer_exposes_uninstall():
+    script_path = os.path.join(PROJECT_ROOT, "packaging", "AirClick.iss")
+    with open(script_path, encoding="utf-8") as installer_script:
+        contents = installer_script.read()
+
+    assert "Uninstallable=yes" in contents
+    assert 'Name: "{group}\\Uninstall {#AppName}"; Filename: "{uninstallexe}"' in contents
+
+
 if __name__ == "__main__":
     test_release_files_exist()
+    test_installer_exposes_uninstall()
     print("All release layout tests passed.")

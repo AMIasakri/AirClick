@@ -132,3 +132,13 @@ if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 ```
 
 فایل نصب در `dist/installer/AirClick-Setup-1.0.0.exe` ساخته می‌شود.
+
+## حذف برنامه در Windows
+
+پس از نصب، AirClick را از یکی از این مسیرها حذف کن:
+
+- منوی Start: پوشه‌ی **AirClick** → **Uninstall AirClick**
+- **Settings → Apps → Installed apps** → **AirClick** → **Uninstall**
+
+پوشه‌ی نصب را پیش از اجرای Uninstaller دستی حذف نکن؛ فایل‌های Uninstaller و
+اطلاعات حذف داخل همان پوشه قرار دارند.

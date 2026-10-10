@@ -16,6 +16,12 @@ if ($LASTEXITCODE -ne 0 -or $pythonVersion -ne "3.14.7") {
     throw "The release environment must use Python 3.14.7. Found: $pythonVersion"
 }
 
+$versionFile = Join-Path $projectRoot "config\version.py"
+$appVersion = & $python -I -c "import runpy, sys; print(runpy.run_path(sys.argv[1])['APP_VERSION'])" $versionFile
+if ($LASTEXITCODE -ne 0 -or $appVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "config\version.py must define APP_VERSION as a semantic version (for example, 1.0.0)."
+}
+
 & $python -I -m pip check
 if ($LASTEXITCODE -ne 0) {
     throw "The release environment has missing or incompatible dependencies."
@@ -64,10 +70,10 @@ if (-not $isccPath) {
     throw "Inno Setup is not installed or ISCC.exe could not be located."
 }
 
-$installerPath = Join-Path $projectRoot "dist\installer\AirClick-Setup-1.0.0.exe"
+$installerPath = Join-Path $projectRoot "dist\installer\AirClick-Setup-$appVersion.exe"
 $issPath = Join-Path $projectRoot "packaging\AirClick.iss"
 $buildStarted = Get-Date
-$isccArguments = '"{0}" /Qp "{1}"' -f $isccPath, $issPath
+$isccArguments = '"{0}" /Qp /DAppVersion={1} "{2}"' -f $isccPath, $appVersion, $issPath
 & $env:ComSpec /c $isccArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed with exit code $LASTEXITCODE."

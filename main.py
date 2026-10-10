@@ -21,6 +21,7 @@ from config.settings import (
     PERFORMANCE_SETTINGS,
     validate_settings,
 )
+from config.version import APP_VERSION
 from core.hand_tracker import HandTracker
 from core.gesture_recognizer import GestureRecognizer, GestureStabilizer
 from core.mouse_controller import MouseController
@@ -49,6 +50,8 @@ class HelpWindow:
                  fg="#e94560", bg='#0a0a1a').pack(pady=(18, 4))
         tk.Label(root, text="کنترل موس با دو دست", font=("Segoe UI", 10),
                  fg="#888899", bg='#0a0a1a').pack()
+        tk.Label(root, text=f"نسخه {APP_VERSION}", font=("Segoe UI", 9),
+                 fg="#888899", bg='#0a0a1a').pack(pady=(2, 0))
         tk.Frame(root, height=2, bg='#e94560').pack(fill='x', padx=30, pady=8)
 
         sections = [
@@ -90,7 +93,7 @@ class AirClick:
     def __init__(self):
         validate_settings()
         log_message("=" * 50)
-        log_message("AirClick Pro Starting...")
+        log_message(f"AirClick Pro {APP_VERSION} Starting...")
         log_message("=" * 50)
 
         self.hand_tracker = HandTracker()

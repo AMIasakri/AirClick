@@ -1,5 +1,7 @@
 #define AppName "AirClick"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "0.0.0-dev"
+#endif
 #define AppPublisher "AirClick"
 #define AppExeName "AirClick.exe"
 

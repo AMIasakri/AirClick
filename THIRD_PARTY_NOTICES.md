@@ -34,14 +34,27 @@ AirClick includes `hand_landmarker.task`, a MediaPipe Hand Landmarker model
 asset used for on-device hand tracking. The model is obtained from the
 official MediaPipe model distribution:
 
-- MediaPipe repository: https://github.com/google/mediapipe
-- MediaPipe license: https://github.com/google/mediapipe/blob/master/LICENSE
+- Model file:
+  https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+- SHA-256 of the included file:
+  `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1`
+- MediaPipe repository license:
+  https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE
 - MediaPipe models documentation:
   https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker
 
-Before each public release, confirm that the model asset and its associated
-metadata may be redistributed with the installer under the applicable
-upstream terms.
+The official task documentation identifies the model bundle but does not
+explicitly state the license for this binary asset. The MediaPipe repository's
+Apache 2.0 license alone is not sufficient evidence of the model asset's
+redistribution terms. Confirm those terms with an authoritative model-specific
+source before public release.
+
+## Application icon
+
+`packaging/AirClick.ico` is original artwork created specifically for AirClick
+on 2026-10-10, replacing an earlier icon whose source was not recorded. The
+replacement is composed from geometric shapes and contains no third-party
+image assets.
 
 ## OpenCV bundled notices
 

@@ -14,7 +14,7 @@
 
 <br>
 
-### ⬇️ [Download the Installer / دانلود نصب‌کننده](https://github.com/AMIasakri/AirClick/tree/main/dist/installer)
+### ⬇️ [Download AirClick Setup 1.0.0 / دانلود نصب‌کننده AirClick نسخه 1.0.0](https://github.com/AMIasakri/AirClick/releases/download/v1.0.0/AirClick-Setup-1.0.0.exe)
 
 <br>
 
@@ -56,13 +56,11 @@ You do **not** need to download the source code, install Python, or know anythin
 
 ### Step by step
 
-1. **Open the installer folder:** 👉 [`dist/installer`](https://github.com/AMIasakri/AirClick/tree/main/dist/installer)
-2. **Click the file** named `AirClick-Setup-<version>.exe`.
-3. On the file page, click the **download icon ⬇️** (top-right of the file box, called *"Download raw file"*).
-4. Wait for the download to finish, then **double-click** the downloaded `.exe`.
-5. If Windows shows a blue **"Windows protected your PC"** screen, click **More info → Run anyway**. (This appears for most small independent apps that are not commercially code-signed.)
-6. Follow the installer: choose a folder (or keep the default) and click **Install**.
-7. Open **AirClick** from the **Start Menu** or the **desktop shortcut**. Done! 🎉
+1. **Download the installer:** 👉 [AirClick-Setup-1.0.0.exe](https://github.com/AMIasakri/AirClick/releases/download/v1.0.0/AirClick-Setup-1.0.0.exe) (or open the [v1.0.0 release page](https://github.com/AMIasakri/AirClick/releases/tag/v1.0.0)).
+2. Wait for the download to finish, then **double-click** the downloaded `.exe`.
+3. If Windows shows a blue **"Windows protected your PC"** screen, click **More info → Run anyway**. (This appears for most small independent apps that are not commercially code-signed.)
+4. Follow the installer: choose a folder (or keep the default) and click **Install**.
+5. Open **AirClick** from the **Start Menu** or the **desktop shortcut**. Done! 🎉
 
 > 💡 **Tip:** Allow camera access for desktop apps in *Windows Settings → Privacy & security → Camera*.
 
@@ -189,13 +187,11 @@ If AirClick helped you, **please click the ⭐ Star button at the top of this pa
 
 ### مرحله به مرحله
 
-1. **پوشه‌ی نصب‌کننده را باز کنید:** 👈 [`dist/installer`](https://github.com/AMIasakri/AirClick/tree/main/dist/installer)
-2. روی فایلی به نام `AirClick-Setup-<version>.exe` **کلیک کنید**.
-3. در صفحه‌ی فایل، روی **آیکن دانلود ⬇️** (بالا سمت راست کادر فایل، با عنوان *Download raw file*) بزنید.
-4. صبر کنید دانلود تمام شود، سپس روی فایل دانلودشده **دوبار کلیک** کنید.
-5. اگر ویندوز صفحه‌ی آبی **«Windows protected your PC»** نشان داد، روی **More info** و بعد **Run anyway** بزنید. (این پیام برای بیشتر برنامه‌های مستقل که امضای تجاری ندارند نمایش داده می‌شود.)
-6. مراحل نصب را ادامه دهید: پوشه را انتخاب کنید (یا پیش‌فرض را بپذیرید) و **Install** را بزنید.
-7. AirClick را از **Start Menu** یا **میان‌بر دسکتاپ** اجرا کنید. تمام! 🎉
+1. **نصب‌کننده را دانلود کنید:** 👈 [AirClick-Setup-1.0.0.exe](https://github.com/AMIasakri/AirClick/releases/download/v1.0.0/AirClick-Setup-1.0.0.exe) (یا [صفحه‌ی انتشار نسخه‌ی 1.0.0](https://github.com/AMIasakri/AirClick/releases/tag/v1.0.0) را باز کنید).
+2. صبر کنید دانلود تمام شود، سپس روی فایل دانلودشده **دوبار کلیک** کنید.
+3. اگر ویندوز صفحه‌ی آبی **«Windows protected your PC»** نشان داد، روی **More info** و بعد **Run anyway** بزنید. (این پیام برای بیشتر برنامه‌های مستقل که امضای تجاری ندارند نمایش داده می‌شود.)
+4. مراحل نصب را ادامه دهید: پوشه را انتخاب کنید (یا پیش‌فرض را بپذیرید) و **Install** را بزنید.
+5. AirClick را از **Start Menu** یا **میان‌بر دسکتاپ** اجرا کنید. تمام! 🎉
 
 > 💡 **نکته:** دسترسی دوربین برای برنامه‌های دسکتاپ را در *Settings → Privacy & security → Camera* فعال کنید.
 

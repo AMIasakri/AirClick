@@ -195,6 +195,9 @@ if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 
 ## حذف برنامه در Windows
 
+در Setup می‌توان مسیر نصب را در صفحه‌ی **Select Destination Location** انتخاب
+یا تغییر داد؛ هنگام نصب مجدد، مسیر نصب فعلی به‌صورت پیش‌فرض پیشنهاد می‌شود.
+
 پس از نصب، AirClick را از یکی از این مسیرها حذف کن:
 
 - منوی Start: پوشه‌ی **AirClick** → **Uninstall AirClick**

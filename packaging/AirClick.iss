@@ -13,6 +13,7 @@ AppPublisher={#AppPublisher}
 SetupIconFile=AirClick.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 DefaultDirName={autopf}\{#AppName}
+DisableDirPage=no
 DefaultGroupName={#AppName}
 OutputDir=..\dist\installer
 OutputBaseFilename=AirClick-Setup-{#AppVersion}
@@ -35,8 +36,8 @@ Source: "AirClick.ico"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{app}\logs"; Permissions: users-modify
 
 [Icons]
-Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
+Name: "{userdesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\AirClick.ico"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\AirClick.ico"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 
 [UninstallDelete]

@@ -38,6 +38,15 @@ def test_installer_exposes_uninstall():
 
     assert "Uninstallable=yes" in contents
     assert 'Name: "{group}\\Uninstall {#AppName}"; Filename: "{uninstallexe}"' in contents
+    assert "DisableDirPage=no" in contents
+    assert (
+        'Name: "{userdesktop}\\{#AppName}"; Filename: "{app}\\{#AppExeName}"; '
+        'IconFilename: "{app}\\AirClick.ico"'
+    ) in contents
+    assert (
+        'Name: "{group}\\{#AppName}"; Filename: "{app}\\{#AppExeName}"; '
+        'IconFilename: "{app}\\AirClick.ico"'
+    ) in contents
 
 
 def test_application_icon_is_valid():

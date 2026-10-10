@@ -51,6 +51,12 @@ Apache 2.0 license alone is not sufficient evidence of the model asset's
 redistribution terms. Confirm those terms with an authoritative model-specific
 source or the model publisher before public release.
 
+A MediaPipe maintainer has separately confirmed that a specific Pose Landmarker
+task bundle is Apache 2.0 in
+[google-ai-edge/mediapipe#6306](https://github.com/google-ai-edge/mediapipe/issues/6306).
+That answer concerns a different model asset and does not establish the license
+for this Hand Landmarker bundle.
+
 ## Application icon
 
 `packaging/AirClick.ico` is original artwork created specifically for AirClick

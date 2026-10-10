@@ -12,3 +12,9 @@ All notable changes to AirClick are documented in this file.
 - Windows installer with Start Menu and desktop shortcuts, plus an uninstaller.
 - Optional, size-limited application logs with a first-run consent prompt.
 - Persian setup instructions, privacy information, and a release checklist.
+
+### Fixed
+
+- Removed the default 100 ms PyAutoGUI pause from frame-by-frame cursor control.
+- Changed the on-screen FPS to a rolling recent rate and added averaged stage
+  timings to the debug panel.

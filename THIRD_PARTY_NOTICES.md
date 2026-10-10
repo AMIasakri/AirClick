@@ -42,12 +42,14 @@ official MediaPipe model distribution:
   https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE
 - MediaPipe models documentation:
   https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker
+- Google model card for MediaPipe Hands (Lite/Full):
+  https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Hand%20Tracking%20(Lite_Full)%20with%20Fairness%20Oct%202021.pdf
 
-The official task documentation identifies the model bundle but does not
+The official task documentation and model card describe the model but do not
 explicitly state the license for this binary asset. The MediaPipe repository's
 Apache 2.0 license alone is not sufficient evidence of the model asset's
 redistribution terms. Confirm those terms with an authoritative model-specific
-source before public release.
+source or the model publisher before public release.
 
 ## Application icon
 

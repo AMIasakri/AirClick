@@ -74,6 +74,23 @@ def test_invalid_frame_dimensions_are_rejected():
             raise AssertionError("Invalid frame dimensions must raise ValueError")
 
 
+def test_controller_disables_pyautogui_per_call_delay():
+    original_size = mouse_module.pyautogui.size
+    original_pause = mouse_module.pyautogui.PAUSE
+    original_failsafe = mouse_module.pyautogui.FAILSAFE
+    original_minimum_duration = mouse_module.pyautogui.MINIMUM_DURATION
+    mouse_module.pyautogui.size = lambda: (1000, 800)
+
+    try:
+        MouseController()
+        assert mouse_module.pyautogui.PAUSE == 0
+    finally:
+        mouse_module.pyautogui.size = original_size
+        mouse_module.pyautogui.PAUSE = original_pause
+        mouse_module.pyautogui.FAILSAFE = original_failsafe
+        mouse_module.pyautogui.MINIMUM_DURATION = original_minimum_duration
+
+
 def test_scroll_reanchors_and_respects_dead_zone():
     controller = make_controller()
     scrolls = []
@@ -113,6 +130,7 @@ if __name__ == "__main__":
     test_relative_move_reanchors_without_jumping()
     test_relative_move_clamps_to_screen()
     test_invalid_frame_dimensions_are_rejected()
+    test_controller_disables_pyautogui_per_call_delay()
     test_scroll_reanchors_and_respects_dead_zone()
     test_pause_tracking_releases_active_drag()
     print("All MouseController tests passed.")

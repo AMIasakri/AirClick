@@ -53,6 +53,7 @@ class MouseController:
         self.menu_mode = False
 
         pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0
         pyautogui.MINIMUM_DURATION = 0.01
         log_message(f"Screen: {self.screen_width}x{self.screen_height}")
         log_message("MouseController ready")

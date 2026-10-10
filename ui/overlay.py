@@ -53,20 +53,43 @@ class OverlayRenderer:
         return frame
 
     def draw_panel(self, frame, x1, y1, x2, y2, alpha=0.82, border_color=None):
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), COLORS['panel_bg'], -1)
+        height, width = frame.shape[:2]
+        x_start = max(0, x1 - 2)
+        y_start = max(0, y1 - 2)
+        x_end = min(width, x2 + 3)
+        y_end = min(height, y2 + 3)
+        region = frame[y_start:y_end, x_start:x_end]
+        if region.size == 0:
+            return frame
+
+        overlay = region.copy()
+        top_left = (x1 - x_start, y1 - y_start)
+        bottom_right = (x2 - x_start, y2 - y_start)
+        cv2.rectangle(overlay, top_left, bottom_right, COLORS['panel_bg'], -1)
         if border_color:
-            cv2.rectangle(overlay, (x1, y1), (x2, y2), border_color, 1, cv2.LINE_AA)
-        return cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+            cv2.rectangle(overlay, top_left, bottom_right, border_color, 1, cv2.LINE_AA)
+        region[:] = cv2.addWeighted(overlay, alpha, region, 1 - alpha, 0)
+        return frame
 
     def draw_pill(self, frame, text, x, y, color, scale=0.42):
         (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
         pad_x, pad_y = 10, 5
         x1, y1 = x, y - th - pad_y
         x2, y2 = x + tw + pad_x * 2, y + pad_y
-        sub = frame.copy()
-        cv2.rectangle(sub, (x1, y1), (x2, y2), color, -1, cv2.LINE_AA)
-        cv2.addWeighted(sub, 0.16, frame, 0.84, 0, frame)
+        height, width = frame.shape[:2]
+        x_start = max(0, x1 - 2)
+        y_start = max(0, y1 - 2)
+        x_end = min(width, x2 + 3)
+        y_end = min(height, y2 + 3)
+        region = frame[y_start:y_end, x_start:x_end]
+        if region.size == 0:
+            return
+
+        sub = region.copy()
+        top_left = (x1 - x_start, y1 - y_start)
+        bottom_right = (x2 - x_start, y2 - y_start)
+        cv2.rectangle(sub, top_left, bottom_right, color, -1, cv2.LINE_AA)
+        region[:] = cv2.addWeighted(sub, 0.16, region, 0.84, 0)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1, cv2.LINE_AA)
         cv2.putText(frame, text, (x + pad_x, y), cv2.FONT_HERSHEY_SIMPLEX,
                     scale, COLORS['text_primary'], 1, cv2.LINE_AA)
@@ -135,10 +158,13 @@ class OverlayRenderer:
 
     def draw_zones(self, frame, split_x, top_bar, bottom_bar):
         h, w = frame.shape[:2]
-        zone = frame.copy()
-        cv2.rectangle(zone, (0, top_bar), (split_x, h - bottom_bar), (40, 80, 40), -1)
-        cv2.rectangle(zone, (split_x, top_bar), (w, h - bottom_bar), (80, 50, 30), -1)
-        frame[:] = cv2.addWeighted(zone, 0.10, frame, 0.90, 0)
+        zone_bottom = h - bottom_bar
+        region = frame[top_bar:zone_bottom + 1, :]
+        zone = region.copy()
+        local_bottom = zone_bottom - top_bar
+        cv2.rectangle(zone, (0, 0), (split_x, local_bottom), (40, 80, 40), -1)
+        cv2.rectangle(zone, (split_x, 0), (w, local_bottom), (80, 50, 30), -1)
+        region[:] = cv2.addWeighted(zone, 0.10, region, 0.90, 0)
 
         for y in range(top_bar, h - bottom_bar, 14):
             cv2.line(frame, (split_x, y), (split_x, min(y + 7, h - bottom_bar)),
@@ -160,11 +186,23 @@ class OverlayRenderer:
         cv2.putText(frame, "HAND CONTROL", (202, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, COLORS['text_muted'], 1, cv2.LINE_AA)
 
-        if fps is not None:
-            self.draw_pill(frame, f"{fps:.0f} FPS", w - 92, 30, COLORS['success'], scale=0.36)
+        shortcuts = "Q  H  D  P"
+        shortcut_scale = 0.34
+        (shortcut_width, _), _ = cv2.getTextSize(
+            shortcuts, cv2.FONT_HERSHEY_SIMPLEX, shortcut_scale, 1,
+        )
+        shortcut_x = w - shortcut_width - 18
 
-        cv2.putText(frame, "Q  H  D", (w - 52, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.34, COLORS['text_muted'], 1, cv2.LINE_AA)
+        if fps is not None:
+            fps_label = f"{fps:.0f} FPS"
+            (fps_width, _), _ = cv2.getTextSize(
+                fps_label, cv2.FONT_HERSHEY_SIMPLEX, 0.36, 1,
+            )
+            fps_x = shortcut_x - fps_width - 32
+            self.draw_pill(frame, fps_label, fps_x, 30, COLORS['success'], scale=0.36)
+
+        cv2.putText(frame, shortcuts, (shortcut_x, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, shortcut_scale, COLORS['text_muted'], 1, cv2.LINE_AA)
         return frame
 
     def draw_footer(self, frame, mode, mode_color, right_gesture, left_gesture,
@@ -285,11 +323,11 @@ class OverlayRenderer:
             frame = self.draw_debug_panel(frame, state['debug_info'])
 
         if mode == "LOCKED" and state.get('hand_was_detected'):
-            self.draw_center_message(frame, "NO HANDS", COLORS['danger'])
+            self.draw_center_message(frame, "NO HANDS DETECTED", COLORS['danger'])
         if state.get('controls_paused'):
-            self.draw_center_message(frame, "PAUSED - PRESS P", COLORS['warning'])
+            self.draw_center_message(frame, "PAUSED - PRESS P TO RESUME", COLORS['warning'])
 
         if state.get('hands_too_close'):
-            self.draw_warning_banner(frame, "Hands too close - spread apart!")
+            self.draw_warning_banner(frame, "Hands too close - move them apart")
 
         return frame

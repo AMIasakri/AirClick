@@ -62,6 +62,7 @@ class HandTracker:
                 "راه‌اندازی موتور تشخیص دست ناموفق بود. برنامه را دوباره اجرا کنید."
             ) from error
         self.last_timestamp_ms = 0
+        self.last_inference_ms = 0.0
         
         # لیست‌های اصلی
         self.hands_detected = []
@@ -178,7 +179,9 @@ class HandTracker:
         if timestamp_ms <= self.last_timestamp_ms:
             timestamp_ms = self.last_timestamp_ms + 1
         self.last_timestamp_ms = timestamp_ms
+        inference_started = time.perf_counter()
         detection_result = self.detector.detect_for_video(mp_image, timestamp_ms)
+        self.last_inference_ms = (time.perf_counter() - inference_started) * 1000
         
         # پاک کردن لیست‌های موقت
         self.hands_detected = []

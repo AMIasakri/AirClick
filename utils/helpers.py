@@ -10,7 +10,9 @@ import json
 import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
+from collections import deque
 import traceback
+import time
 
 MAX_LOG_BYTES = 512 * 1024
 INSTALL_REGISTRY_KEY = r"Software\AirClick"
@@ -119,7 +121,7 @@ def configure_logging():
             root.withdraw()
             consent = messagebox.askyesno(
                 "AirClick",
-                "آیا می‌خواهید سابقه خطا و عملکرد برنامه ذخیره شود؟\n"
+                "آیا می‌خواهید گزارش خطاها و عملکرد برنامه در فایل لاگ ذخیره شود؟\n"
                 "حجم لاگ حداکثر ۵۱۲ کیلوبایت است و کنار برنامه ذخیره می‌شود.",
                 parent=root,
             )
@@ -177,9 +179,49 @@ def require_installed_build():
         raise SystemExit(1)
 
 
-def get_fps(start_time, frame_count):
-    import time
-    elapsed = time.time() - start_time
-    if elapsed == 0:
-        return 0
-    return frame_count / elapsed
+class RollingFpsCounter:
+    def __init__(self, window_seconds=2.0):
+        if window_seconds <= 0:
+            raise ValueError("window_seconds must be positive")
+        self.window_seconds = window_seconds
+        self._frame_times = deque()
+
+    def tick(self, now=None):
+        now = time.monotonic() if now is None else now
+        if self._frame_times and now <= self._frame_times[-1]:
+            raise ValueError("frame timestamps must increase")
+
+        self._frame_times.append(now)
+        cutoff = now - self.window_seconds
+        while self._frame_times[0] < cutoff:
+            self._frame_times.popleft()
+
+        if len(self._frame_times) < 2:
+            return 0.0
+        elapsed = self._frame_times[-1] - self._frame_times[0]
+        return (len(self._frame_times) - 1) / elapsed
+
+
+class RollingPerformanceMonitor:
+    def __init__(self, window_seconds=2.0):
+        if window_seconds <= 0:
+            raise ValueError("window_seconds must be positive")
+        self.window_seconds = window_seconds
+        self._samples = deque()
+
+    def update(self, metrics, now=None):
+        now = time.monotonic() if now is None else now
+        if self._samples and now <= self._samples[-1][0]:
+            raise ValueError("sample timestamps must increase")
+
+        self._samples.append((now, dict(metrics)))
+        cutoff = now - self.window_seconds
+        while self._samples[0][0] < cutoff:
+            self._samples.popleft()
+
+        sample_count = len(self._samples)
+        keys = self._samples[-1][1]
+        return {
+            key: sum(sample[1][key] for sample in self._samples) / sample_count
+            for key in keys
+        }

@@ -30,7 +30,8 @@ from utils.helpers import (
     configure_logging,
     log_exception,
     log_message,
-    get_fps,
+    RollingFpsCounter,
+    RollingPerformanceMonitor,
     require_installed_build,
     show_error,
 )
@@ -79,7 +80,7 @@ class HelpWindow:
                          fg=color, bg='#12122a').pack(side='right', padx=10)
 
         for tip in ["💡 نور کافی داشته باش", "↔️  دست‌ها را از هم فاصله بده",
-                    "⌨️  q=خروج | h=راهنما | p=توقف موس | d=دیباگ"]:
+                    "⌨️  q=خروج | h=راهنما | p=توقف/ادامه موس | d=دیباگ"]:
             tk.Label(root, text=tip, font=("Segoe UI", 9),
                      fg="#666688", bg='#0a0a1a').pack(pady=2)
 
@@ -115,11 +116,13 @@ class AirClick:
         self.running = False
         self.controls_paused = False
         self.frame_count = 0
-        self.start_time = time.time()
+        self.fps_counter = RollingFpsCounter()
         self._frame_lock = threading.Lock()
         self._latest_display = None
         self._worker_error = None
         self._capture_thread = None
+        self.performance_info = []
+        self.performance_monitor = RollingPerformanceMonitor()
 
         self.left_hand_index = -1
         self.right_hand_index = -1
@@ -231,15 +234,35 @@ class AirClick:
     def _capture_loop(self):
         try:
             while self.running:
+                read_started = time.perf_counter()
                 ret, frame = self.cap.read()
+                camera_read_ms = (time.perf_counter() - read_started) * 1000
                 if not ret:
                     with self._frame_lock:
                         self._worker_error = "Could not read a frame from the camera."
                     break
 
                 frame = cv2.flip(frame, 1)
+                processing_started = time.perf_counter()
                 self.process_frame(frame)
-                display = self.draw_overlay(frame)
+                processing_ms = (time.perf_counter() - processing_started) * 1000
+                inference_ms = self.hand_tracker.last_inference_ms
+                fps = self.fps_counter.tick()
+                overlay_started = time.perf_counter()
+                display = self.draw_overlay(frame, fps)
+                overlay_ms = (time.perf_counter() - overlay_started) * 1000
+                averages = self.performance_monitor.update({
+                    "camera_read": camera_read_ms,
+                    "hand_model": inference_ms,
+                    "app_logic": max(0.0, processing_ms - inference_ms),
+                    "overlay": overlay_ms,
+                })
+                self.performance_info = [
+                    f"Camera avg: {averages['camera_read']:.1f} ms",
+                    f"Model avg: {averages['hand_model']:.1f} ms",
+                    f"App avg: {averages['app_logic']:.1f} ms",
+                    f"Overlay avg: {averages['overlay']:.1f} ms",
+                ]
                 with self._frame_lock:
                     self._latest_display = display
                     self.frame_count += 1
@@ -484,7 +507,7 @@ class AirClick:
             if f:
                 self.debug_info.append(f"Fingers: idx={f[1]} mid={f[2]} rng={f[3]} pnk={f[4]}")
 
-    def draw_overlay(self, frame):
+    def draw_overlay(self, frame, fps):
         def hand_state(index):
             if index == -1:
                 return None, False
@@ -517,13 +540,13 @@ class AirClick:
             'left_landmarks': None,
             'show_landmarks': False,
             'show_fps': self.show_fps,
-            'fps': get_fps(self.start_time, self.frame_count),
+            'fps': fps,
             'mode': self.mouse_mode,
             'controls_paused': self.controls_paused,
             'hand_separation': self.hand_tracker.hand_separation,
             'hands_too_close': self.hands_too_close,
             'show_debug': self.show_debug,
-            'debug_info': self.debug_info,
+            'debug_info': [*self.debug_info, *self.performance_info],
             'hand_was_detected': self.hand_was_detected,
         }
         return self.overlay_renderer.render(frame, state)
@@ -559,7 +582,7 @@ if __name__ == "__main__":
         show_error(
             "AirClick",
             "برنامه با خطا متوقف شد.\n"
-            "جزئیات خطا در فایل لاگ ذخیره شده است.",
+            "اگر ذخیره‌ی لاگ را فعال کرده‌اید، جزئیات خطا در فایل لاگ قرار دارد.",
         )
     finally:
         cv2.destroyAllWindows()
